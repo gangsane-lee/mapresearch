@@ -1,0 +1,29 @@
+{
+  "name": "aptlog",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "migrate": "node db/run-migrations.js",
+    "migrate:status": "node db/run-migrations.js --status",
+    "geo:build": "node geo/build-boundaries.js",
+    "dev:api": "npm run dev -w api",
+    "start": "npm start -w api",
+    "test": "node --test \"db/test/*.test.js\" \"geo/test/*.test.js\" && npm test -w api && npm test -w web",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -w web",
+    "test:db": "node --env-file=.env.test --test \"api/test-db/*.test.js\""
+  },
+  "dependencies": {
+    "mssql": "12.7.13"
+  },
+  "devDependencies": {
+    "mapshaper": "0.7.101"
+  }
+}

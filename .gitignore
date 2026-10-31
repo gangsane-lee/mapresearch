@@ -1,0 +1,17 @@
+node_modules/
+.env
+*.log
+dist/
+web/dist/
+# 외부에서 받은 원본 경계 데이터 (빌드 입력, 커밋하지 않음)
+geo/raw/*
+!geo/raw/.gitkeep
+# 로컬 런타임 산출물
+media/
+backup/
+scripts/service/*.exe
+scripts/service/*.xml
+scripts/service/logs/
+# 로컬 미리보기 설정 (스크래치 경로 포함)
+.claude/launch.json
+.env.test
