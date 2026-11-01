@@ -1,6 +1,16 @@
 # CLAUDE.md — AptLog 작업 규칙
 
 기준 문서: `APTLOG_DEV_PLAN.md` (요구사항·스키마·API·단계·완료 기준). 충돌 시 계획서가 우선이며, 변경이 필요하면 계획서를 먼저 수정한다(§14 개정 이력에 기록).
+처음이면 `docs/PROGRESS.md`(현재 상태·다음 할 일)와 계획서 §14 개정 이력부터 읽는다. 설치·운영 절차는 `README.md`.
+
+## 실행 환경 (맥미니에서 개발·운영 함께)
+- 운영: `.env` → `RealtyLog_PROD`, `PORT=5180`, launchd(`com.aptlog.api`·`backup`·`trades`)가 상시 실행. 빌드된 `web/dist` 를 API가 서빙.
+- 개발: `.env.dev` → `RealtyLog_DEV`, `PORT=5181`. `npm run dev` = API `node --watch` + Vite 5173(저장 즉시 반영). 미리보기 서버는 `.claude/launch.json` 의 `aptlog-web-hmr` + `aptlog-api-dev`.
+- 테스트: `.env.test` → `RealtyLog_TEST` 에서만 `npm run test:db` (시험 단지를 매번 만든다 — 운영·개발 DB에 돌리지 않는다).
+- SQL Server 는 Docker 컨테이너(`docker compose up -d`, 127.0.0.1:1433). Windows PC는 `.\SQLEXPRESS`.
+- 작업은 개발 DB·5173 에서 확인 → `npm test` → 운영 반영은 `npm run backup && npm run migrate && npm run build` 후 `launchctl kickstart -k gui/$(id -u)/com.aptlog.api`.
+- 설치 상태 점검: `npm run check` / `npm run check:dev` (읽기 전용).
+- 저장소는 **public** — 키·비밀번호·개인 정보를 코드·문서·커밋 메시지에 넣지 않는다. 커밋·푸시는 사용자가 요청할 때만.
 
 ## 작업 방식
 - 단계(P0→P5) 순서로 진행하고, 각 단계 완료 기준(§11)을 충족했는지 확인 후 다음 단계로. MVP는 P0~P2.

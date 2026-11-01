@@ -57,6 +57,7 @@ export const patchInput = z
     lat,
     lng,
     status: z.enum(STATUS),
+    isFavorite: z.boolean(),
     tags: z.array(z.string().min(1).max(30)).max(20),
   })
   .partial()
@@ -171,6 +172,7 @@ export async function patchComplex(pool, complexId, body) {
     if (v.displayNm != null) (r.input('n', sql.NVarChar(100), v.displayNm), sets.push('display_nm = @n'));
     if (v.lat != null) (r.input('la', sql.Decimal(9, 6), v.lat), r.input('ln', sql.Decimal(9, 6), v.lng), sets.push('lat = @la', 'lng = @ln'));
     if (v.status != null) (r.input('st', sql.VarChar(20), v.status), sets.push('status = @st'));
+    if (v.isFavorite != null) (r.input('fv', sql.Bit, v.isFavorite), sets.push('is_favorite = @fv'));
     const u = await r.query(`UPDATE dbo.complex SET ${sets.join(', ')} WHERE complex_id = @c`);
     if (!u.rowsAffected[0]) throw new AppError('NOT_FOUND', '단지를 찾을 수 없습니다', 404);
     if (v.tags) await replaceTags(req, complexId, v.tags);
@@ -206,6 +208,12 @@ export async function getComplex(pool, complexId) {
     decidedAt: m.decided_at,
   }));
   const ext = (await req().query('SELECT source, ext_id, valid_from, valid_to FROM dbo.complex_ext_id WHERE complex_id = @c')).recordset;
+  // 이 단지에 연결된 매매 실거래의 실제 전용면적 (평형 면적을 실거래에 맞추는 후보)
+  const tradeAreas = (
+    await req().query(`SELECT t.excl_m2, COUNT(*) AS cnt, MAX(t.deal_date) AS last_date
+                       FROM dbo.trade t WHERE t.complex_id = @c AND t.cancel_flag = 0
+                       GROUP BY t.excl_m2 ORDER BY COUNT(*) DESC`)
+  ).recordset.map((t) => ({ exclM2: num(t.excl_m2), cnt: t.cnt, lastDate: ymd(t.last_date) }));
   return {
     complexId: c.complex_id,
     displayNm: c.display_nm,
@@ -216,6 +224,7 @@ export async function getComplex(pool, complexId) {
     lat: num(c.lat),
     lng: num(c.lng),
     status: c.status,
+    isFavorite: !!c.is_favorite,
     createdAt: c.created_at,
     tags,
     areaTypes: areas.map((a) => ({
@@ -233,5 +242,24 @@ export async function getComplex(pool, complexId) {
     pendingRevision: revs.find((r) => r.status === 'PENDING') ?? null,
     revisions: revs,
     externalIds: ext.map((e) => ({ source: e.source, extId: e.ext_id, validFrom: ymd(e.valid_from), validTo: ymd(e.valid_to) })),
+    tradeAreas,
   };
+}
+
+const areaPatch = z.object({ exclM2: z.number().positive().max(500) });
+
+/**
+ * 평형의 전용㎡ 바로잡기 (등록 때 평→㎡ 추정값을 넣었는데 실거래의 실제 면적과 다를 때).
+ * area_type 은 스냅샷이 아니라 단지 속성이라 수정 가능 — 같은 평형 id 를 쓰는 기존 호가 기록은 그대로 이어진다.
+ */
+export async function patchAreaType(pool, complexId, areaTypeId, body) {
+  const v = parse(areaPatch, body);
+  const r = await pool
+    .request()
+    .input('c', sql.Int, complexId)
+    .input('a', sql.Int, areaTypeId)
+    .input('e', sql.Decimal(7, 2), v.exclM2)
+    .query('UPDATE dbo.area_type SET excl_m2 = @e WHERE area_type_id = @a AND complex_id = @c');
+  if (!r.rowsAffected[0]) throw new AppError('NOT_FOUND', '평형을 찾을 수 없습니다', 404);
+  return { areaTypeId, exclM2: v.exclM2 };
 }

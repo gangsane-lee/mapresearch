@@ -54,7 +54,7 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
                  ORDER BY v.observed_at DESC, v.snapshot_id DESC) x
     WHERE f.active = 1;
 
-    SELECT c.complex_id, c.display_nm, c.status, c.lat, c.lng, c.sigungu_cd, rg.sgg_nm,
+    SELECT c.complex_id, c.display_nm, c.status, c.is_favorite, c.lat, c.lng, c.sigungu_cd, rg.sgg_nm,
            m.use_apr_day, m.hhld_cnt, m.dong_cnt, m.max_floor, m.hall_type, m.far_ratio, m.bc_ratio, m.builder,
            a.area_type_id, a.label AS area_label, a.excl_m2, a.rooms, a.baths
     FROM dbo.complex c
@@ -126,6 +126,7 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
         complexId: id,
         displayNm: h.display_nm,
         status: h.status,
+        isFavorite: !!h.is_favorite,
         sggNm: h.sgg_nm,
         lat: pos?.lat ?? null,
         lng: pos?.lng ?? null,

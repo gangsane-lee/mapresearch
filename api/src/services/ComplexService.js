@@ -7,8 +7,8 @@ export async function listSummary(pool) {
     DECLARE @tol decimal(5,2) = COALESCE(TRY_CAST((SELECT setting_val FROM dbo.setting WHERE setting_key = 'area_match_tolerance_m2') AS decimal(5,2)), 0.5);
     DECLARE @gap decimal(6,2) = COALESCE(TRY_CAST((SELECT setting_val FROM dbo.setting WHERE setting_key = 'flag_gap_pct') AS decimal(6,2)), -5);
     SELECT @gap AS flag_gap_pct;
-    SELECT c.complex_id, c.display_nm, c.sigungu_cd, c.lat, c.lng, c.status,
-           a.area_type_id, a.label AS area_label,
+    SELECT c.complex_id, c.display_nm, c.sigungu_cd, c.lat, c.lng, c.status, c.is_favorite,
+           a.area_type_id, a.label AS area_label, a.excl_m2 AS area_excl_m2,
            p.num_val AS price_ask, p.eff_observed_at AS price_ask_observed_at, p.is_carried AS price_ask_carried,
            d.delta AS price_ask_delta,
            ls.last_observed_at,
@@ -61,8 +61,10 @@ export function toSummary(row, gapThresholdPct = -5) {
     lat: num(row.lat),
     lng: num(row.lng),
     status: row.status,
+    isFavorite: !!row.is_favorite,
     areaTypeId: row.area_type_id ?? null,
     areaLabel: row.area_label ?? null,
+    areaExclM2: num(row.area_excl_m2),
     priceAsk: num(row.price_ask),
     priceAskObservedAt: ymd(row.price_ask_observed_at),
     priceAskCarried: !!row.price_ask_carried,

@@ -9,7 +9,8 @@ USING (VALUES
     (N'시청역',      'CBD',  37.565715, 126.977088, 20),
     (N'여의도역',    'CBD',  37.521747, 126.924015, 30),
     (N'내 직장',     'WORK', NULL,      NULL,       40),
-    (N'배우자 직장', 'WORK', NULL,      NULL,       50)
+    (N'배우자 직장', 'WORK', NULL,      NULL,       50),
+    (N'현재 집',     'HOME', NULL,      NULL,       5)
 ) AS s (name, kind, lat, lng, sort)
 ON t.name = s.name
 WHEN NOT MATCHED THEN INSERT (name, kind, lat, lng, sort) VALUES (s.name, s.kind, s.lat, s.lng, s.sort);

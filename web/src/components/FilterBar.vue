@@ -8,12 +8,24 @@ defineProps({
   tags: { type: Array, required: true },
   flaggedOnly: { type: Boolean, default: false },
   flaggedCount: { type: Number, default: 0 },
+  favoriteOnly: { type: Boolean, default: false },
+  favoriteCount: { type: Number, default: 0 },
 });
-const emit = defineEmits(['toggle-status', 'toggle-tag', 'toggle-flagged']);
+const emit = defineEmits(['toggle-status', 'toggle-tag', 'toggle-flagged', 'toggle-favorite']);
 </script>
 
 <template>
   <div class="filters">
+    <button
+      type="button"
+      class="chip fav"
+      :class="{ on: favoriteOnly }"
+      :aria-pressed="favoriteOnly"
+      title="★ 관심 단지만 보기"
+      @click="emit('toggle-favorite')"
+    >
+      ★ 관심 {{ favoriteCount }}
+    </button>
     <button
       v-if="flaggedCount"
       type="button"
@@ -53,6 +65,8 @@ const emit = defineEmits(['toggle-status', 'toggle-tag', 'toggle-flagged']);
 
 <style scoped>
 .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip.fav { color: var(--accent); font-weight: 600; }
+.chip.fav.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .chip.flag { border-color: var(--warn-line); background: var(--tint-warn); color: var(--warn); font-weight: 600; }
 .chip.flag.on { background: var(--warn); border-color: var(--warn); color: #fff; }
 .sep { width: 1px; height: 16px; background: var(--line-strong); margin: 0 6px; }

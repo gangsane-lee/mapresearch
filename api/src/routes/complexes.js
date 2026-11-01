@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { listSummary } from '../services/ComplexService.js';
-import { createManual, patchComplex, getComplex } from '../services/ComplexWriteService.js';
+import { createManual, patchComplex, getComplex, patchAreaType } from '../services/ComplexWriteService.js';
 import { listSnapshots, getDraft, createSnapshot, getSeries, getCommuteSeries } from '../services/SnapshotService.js';
 import { listTrades } from '../services/TradeService.js';
 import { linkTrades } from '../services/TradeSyncService.js';
@@ -30,6 +30,10 @@ export function complexesRouter({ getPool }) {
 
   r.patch('/:id', async (req, res) => {
     res.json(await patchComplex(await getPool(), idParam(req.params.id), req.body));
+  });
+
+  r.patch('/:id/area-types/:areaTypeId', async (req, res) => {
+    res.json(await patchAreaType(await getPool(), idParam(req.params.id), idParam(req.params.areaTypeId), req.body));
   });
 
   r.get('/:id/snapshots', async (req, res) => {

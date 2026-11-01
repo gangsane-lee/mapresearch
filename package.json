@@ -10,10 +10,14 @@
     "node": ">=24"
   },
   "scripts": {
+    "dev": "node scripts/dev.js",
     "migrate": "node db/run-migrations.js",
     "migrate:status": "node db/run-migrations.js --status",
+    "migrate:dev": "node --env-file=.env.dev db/run-migrations.js",
     "db:setup": "node scripts/setup-db.js",
+    "db:setup:dev": "node scripts/setup-db.js --env-file .env.dev",
     "check": "node scripts/check-setup.js",
+    "check:dev": "node scripts/check-setup.js --env-file .env.dev",
     "geo:build": "node geo/build-boundaries.js",
     "dev:api": "npm run dev -w api",
     "start": "npm start -w api",

@@ -143,6 +143,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .apt-marker .bubble i { font-style: normal; font-size: 10.5px; font-weight: 600; }
 .apt-marker .bubble i.up { color: #f5a493; }
 .apt-marker .bubble i.down { color: #9fbfee; }
+.apt-marker .bubble .fav { color: var(--champagne); font-size: 12px; margin-right: 1px; }
 .apt-marker .bubble .flag {
   align-self: center; display: inline-grid; place-items: center; width: 14px; height: 14px; margin-right: 1px;
   border-radius: 50%; background: var(--champagne); color: var(--ink); font-size: 10px; font-weight: 800;

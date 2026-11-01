@@ -224,4 +224,13 @@ test('실거래 적재(가짜 응답) → 같은 필지 두 단지 이름으로 
   assert.deepEqual([na.tradeCnt, na.complexId], [1, null]);
   const sub = (await kaptAt(pool, { bjdCd: '1162010100', jibun: `${jibun}-7`, top: 50 })).find((c) => c.danjiId === id('01'));
   assert.equal(sub.match, 'SAME_BON', '부번이 달라도 같은 본번이면 후보');
+
+  // 행정구역 개편: 네이버가 새 법정동코드를 주면 같은 시(코드 앞 4자리)의 읍면동+지번, 또는 도로명주소로 찾는다
+  const road = `시험로${n % 1000}길 ${jibun}`;
+  await pool.request().input('d', sql.Char(14), id('01')).input('r', sql.NVarChar(200), road).query('UPDATE dbo.kapt_ref SET road_addr = @r WHERE danji_id = @d');
+  const moved = (await kaptAt(pool, { bjdCd: '1162099900', jibun, umdNm: '봉천동', top: 50 })).find((c) => c.danjiId === id('01'));
+  assert.equal(moved?.match, 'EXACT', '법정동코드가 달라도 같은 시·같은 동·같은 지번');
+  const byRoad = (await kaptAt(pool, { bjdCd: '1199999999', jibun: '1', roadKey: road, top: 50 })).find((c) => c.danjiId === id('01'));
+  assert.equal(byRoad?.match, 'EXACT', '도로명주소가 같으면 다른 시군구 코드여도 후보');
+  assert.equal((await kaptAt(pool, { bjdCd: '2699999999', jibun: '1', roadKey: road, top: 50 })).some((c) => c.danjiId === id('01')), false, '다른 시도의 같은 도로명은 제외');
 });

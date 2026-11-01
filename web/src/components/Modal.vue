@@ -1,24 +1,66 @@
 <script setup>
 // 공용 모달. size="xl" 은 상세 팝업용 95vw × 95vh (계획서 §7.3)
-import { onBeforeUnmount, onMounted } from 'vue';
+// resizable="키": 오른쪽 아래 모서리를 끌어 크기 조절, 크기는 이 브라우저에 기억(키별). 헤더의 □ 로 최대화.
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-defineProps({
+const props = defineProps({
   title: { type: String, required: true },
   size: { type: String, default: 'md' }, // md | lg | xl
+  resizable: { type: String, default: null },
 });
 const emit = defineEmits(['close']);
 
+const box = ref(null);
+const maximized = ref(false);
+const storeKey = () => `aptlog.modal.${props.resizable}`;
+let ro = null;
+let saveTimer = null;
+
+function restoreSize() {
+  if (!props.resizable || !box.value) return;
+  try {
+    const s = JSON.parse(localStorage.getItem(storeKey()) ?? 'null');
+    if (s?.w && s?.h) Object.assign(box.value.style, { width: `${Math.min(s.w, innerWidth - 16)}px`, height: `${Math.min(s.h, innerHeight - 16)}px` });
+  } catch {
+    /* 저장소를 못 쓰면 기본 크기 */
+  }
+}
+function rememberSize() {
+  if (maximized.value || !box.value) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(storeKey(), JSON.stringify({ w: box.value.offsetWidth, h: box.value.offsetHeight }));
+    } catch {
+      /* 무시 */
+    }
+  }, 300);
+}
+
 const onKey = (e) => e.key === 'Escape' && emit('close');
-onMounted(() => window.addEventListener('keydown', onKey));
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+onMounted(() => {
+  window.addEventListener('keydown', onKey);
+  restoreSize();
+  if (props.resizable && box.value && typeof ResizeObserver !== 'undefined') {
+    let first = true;
+    ro = new ResizeObserver(() => (first ? (first = false) : rememberSize()));
+    ro.observe(box.value);
+  }
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey);
+  ro?.disconnect();
+  clearTimeout(saveTimer);
+});
 </script>
 
 <template>
   <div class="backdrop" @mousedown.self="emit('close')">
-    <div class="modal" :class="size" role="dialog" aria-modal="true" :aria-label="title">
+    <div ref="box" class="modal" :class="[size, { resizable: !!resizable, max: maximized }]" role="dialog" aria-modal="true" :aria-label="title">
       <header>
         <h2>{{ title }}</h2>
         <slot name="header-extra" />
+        <button v-if="resizable" type="button" class="btn ghost" :aria-label="maximized ? '원래 크기' : '최대화'" :title="maximized ? '원래 크기' : '최대화'" @click="maximized = !maximized">{{ maximized ? '❐' : '□' }}</button>
         <button type="button" class="btn ghost" aria-label="닫기" @click="emit('close')">닫기</button>
       </header>
       <div class="body"><slot /></div>
@@ -38,6 +80,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
 }
 .modal.lg { width: min(960px, 95vw); }
 .modal.xl { width: 95vw; height: 95vh; }
+/* 크기 조절: 오른쪽 아래 모서리 */
+.modal.resizable { resize: both; overflow: hidden; min-width: 560px; min-height: 360px; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); }
+.modal.resizable.lg { width: min(1180px, 95vw); height: 88vh; }
+.modal.max { width: calc(100vw - 16px) !important; height: calc(100vh - 16px) !important; resize: none; }
 /* 입력·상세 화면 공통 헤더: 잉크 띠 + 명조 제목 (우측 패널 히어로와 같은 언어) */
 header {
   display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 14px 14px 0 0;

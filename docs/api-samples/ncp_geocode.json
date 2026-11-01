@@ -1,0 +1,93 @@
+{
+  "status": "OK",
+  "meta": {
+    "totalCount": 1,
+    "page": 1,
+    "count": 1
+  },
+  "addresses": [
+    {
+      "roadAddress": "경기도 화성시 동탄구 동탄순환대로21길 54 동탄역 센트럴 푸르지오",
+      "jibunAddress": "경기도 화성시 동탄구 청계동 538 동탄역 센트럴 푸르지오",
+      "englishAddress": "54, Dongtansunhwan-daero 21-gil, Dongtan-gu, Hwaseong-si, Gyeonggi-do, Republic of Korea",
+      "addressElements": [
+        {
+          "types": [
+            "SIDO"
+          ],
+          "longName": "경기도",
+          "shortName": "경기도",
+          "code": ""
+        },
+        {
+          "types": [
+            "SIGUGUN"
+          ],
+          "longName": "화성시 동탄구",
+          "shortName": "화성시 동탄구",
+          "code": ""
+        },
+        {
+          "types": [
+            "DONGMYUN"
+          ],
+          "longName": "청계동",
+          "shortName": "청계동",
+          "code": ""
+        },
+        {
+          "types": [
+            "RI"
+          ],
+          "longName": "",
+          "shortName": "",
+          "code": ""
+        },
+        {
+          "types": [
+            "ROAD_NAME"
+          ],
+          "longName": "동탄순환대로21길",
+          "shortName": "동탄순환대로21길",
+          "code": ""
+        },
+        {
+          "types": [
+            "BUILDING_NUMBER"
+          ],
+          "longName": "54",
+          "shortName": "54",
+          "code": ""
+        },
+        {
+          "types": [
+            "BUILDING_NAME"
+          ],
+          "longName": "동탄역 센트럴 푸르지오",
+          "shortName": "동탄역 센트럴 푸르지오",
+          "code": ""
+        },
+        {
+          "types": [
+            "LAND_NUMBER"
+          ],
+          "longName": "538",
+          "shortName": "538",
+          "code": ""
+        },
+        {
+          "types": [
+            "POSTAL_CODE"
+          ],
+          "longName": "18482",
+          "shortName": "18482",
+          "code": ""
+        }
+      ],
+      "x": "127.1142194",
+      "y": "37.1974529",
+      "distance": 0
+    }
+  ],
+  "errorMessage": ""
+}

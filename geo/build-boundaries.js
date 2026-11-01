@@ -1,6 +1,6 @@
 // 시군구 경계 GeoJSON 빌드 (계획서 §2.3, P0 완료 기준: 수도권 합계 2MB 이하)
 //
-//   node geo/build-boundaries.js --input geo/raw/HangJeongDong_ver20260701.geojson [--sido 11,28,41] [--simplify 8%]
+//   node geo/build-boundaries.js --input geo/raw/HangJeongDong_ver20260701.geojson [--sido all | 11,28,41] [--simplify 8%]
 //
 // 입력: vuski/admdongkor 행정동 GeoJSON (직접 내려받아 geo/raw/ 에 둔다 — 커밋하지 않음)
 // 출력:
@@ -19,13 +19,13 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { values: args } = parseArgs({
   options: {
     input: { type: 'string', default: path.join('geo', 'raw', 'HangJeongDong_ver20260701.geojson') },
-    sido: { type: 'string', default: '11,28,41' }, // 서울·인천·경기
+    sido: { type: 'string', default: 'all' }, // 전국 (2026-11-01). 일부만: --sido 11,28,41
     simplify: { type: 'string', default: '8%' },
     'out-root': { type: 'string' }, // 테스트용 출력 루트 (기본: 리포 루트)
   },
 });
 
-const sidoList = args.sido.split(',').map((s) => s.trim());
+const sidoList = args.sido === 'all' ? null : args.sido.split(',').map((s) => s.trim());
 const outRoot = args['out-root'] ? path.resolve(args['out-root']) : root;
 const outDir = path.join(outRoot, 'web', 'public', 'geo');
 
@@ -33,10 +33,10 @@ const raw = await readFile(path.resolve(root, args.input), 'utf8');
 console.log(`입력 ${args.input} (${(raw.length / 1e6).toFixed(1)}MB)`);
 
 // 1) 행정동 → 시군구 dissolve (bbox는 단순화 전 경계로 계산 — 단순화하면 모서리가 깎여 bbox가 줄어든다)
-const filter = `${JSON.stringify(sidoList)}.includes(String(sido))`;
+const filter = sidoList ? `-filter '${JSON.stringify(sidoList)}.includes(String(sido))' ` : '';
 const dissolved = (
   await mapshaper.applyCommands(
-    `-i in.json -filter '${filter}' -dissolve sgg copy-fields=sido,sidonm,sggnm -o out.json format=geojson`,
+    `-i in.json ${filter}-dissolve sgg copy-fields=sido,sidonm,sggnm -o out.json format=geojson`,
     { 'in.json': raw },
   )
 )['out.json'];

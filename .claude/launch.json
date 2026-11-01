@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aptlog-web-hmr",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "-w", "web"],
+      "port": 5173
+    },
+    {
+      "name": "aptlog-api-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--watch", "--env-file=.env.dev", "api/src/server.js"],
+      "port": 5181
+    },
+    {
+      "name": "aptlog-api-watch",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--watch", "--env-file=.env", "api/src/server.js"],
+      "port": 5180
+    },
+    {
+      "name": "aptlog-test",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=.env.test", "api/src/server.js"],
+      "port": 5180
+    }
+  ]
+}

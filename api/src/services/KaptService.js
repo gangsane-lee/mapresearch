@@ -66,8 +66,12 @@ const MATCH = { 1: 'EXACT', 2: 'SAME_BON', 3: 'NAME', 4: 'NEARBY' };
  * 역지오코딩 결과(법정동코드·지번·건물명) → 단지 식별정보 후보 (로컬 DB만).
  * 단지 식별정보의 필지는 대표 필지 하나뿐이라, 정확히 같은 지번이 없으면 같은 본번 → 건물명 → 본번 ±5 순으로 넓힌다.
  * 후보마다 같은 필지의 최근 매매 실거래 1건을 붙인다 (거래 단지명이 이 단지 이름이거나 필지에 단지명이 하나뿐일 때).
+ *
+ * 행정구역 개편(예: 2026 화성시 동탄구 신설)으로 네이버의 법정동코드와 단지 식별정보의 코드가 다를 수 있어,
+ * 후보 범위를 ① 같은 법정동코드 ② 같은 시(코드 앞 4자리)의 같은 읍면동 이름 ③ 같은 시도의 같은 도로명주소로 넓힌다.
+ * 도로명주소가 정확히 같으면 지번과 같은 EXACT 로 본다.
  */
-export async function kaptAt(pool, { bjdCd, jibun, buildingNm = null, top = 5 }) {
+export async function kaptAt(pool, { bjdCd, jibun, umdNm = null, roadKey = null, buildingNm = null, top = 5 }) {
   if (!/^\d{10}$/.test(bjdCd ?? '')) return [];
   const bon = jibun && /^\d+/.test(jibun) ? Number(jibun.split('-')[0]) : null;
   const r = await pool
@@ -75,16 +79,22 @@ export async function kaptAt(pool, { bjdCd, jibun, buildingNm = null, top = 5 })
     .input('top', sql.Int, top)
     .input('b', sql.Char(10), bjdCd)
     .input('j', sql.NVarChar(30), jibun)
+    .input('umd', sql.NVarChar(40), umdNm || null)
+    .input('road', sql.NVarChar(200), roadKey || null)
     .input('bon', sql.NVarChar(30), bon == null ? null : String(bon))
     .input('bonLike', sql.NVarChar(31), bon == null ? null : `${bon}-%`)
     .input('bonN', sql.Int, bon)
     .input('bn', sql.NVarChar(100), buildingNm).query(`
       WITH c AS (
         SELECT k.*, TRY_CAST(LEFT(k.jibun, CHARINDEX('-', k.jibun + '-') - 1) AS int) AS k_bon
-        FROM dbo.kapt_ref k WHERE k.bjd_cd = @b AND k.danji_kind = 1),
+        FROM dbo.kapt_ref k
+        WHERE k.danji_kind = 1
+          AND (k.bjd_cd = @b
+               OR (@umd IS NOT NULL AND k.umd_nm = @umd AND k.bjd_cd LIKE LEFT(@b, 4) + '%')
+               OR (@road IS NOT NULL AND k.road_addr = @road AND k.bjd_cd LIKE LEFT(@b, 2) + '%'))),
       m AS (
         SELECT c.*, CASE
-          WHEN c.jibun = @j THEN 1
+          WHEN c.jibun = @j OR (@road IS NOT NULL AND c.road_addr = @road) THEN 1
           WHEN c.jibun = @bon OR c.jibun LIKE @bonLike THEN 2
           WHEN @bn IS NOT NULL AND EXISTS (SELECT 1 FROM (VALUES (c.nm_price), (c.nm_bld), (c.nm_road)) n(v)
                                            WHERE LEN(n.v) >= 2 AND @bn LIKE N'%' + n.v + N'%') THEN 3

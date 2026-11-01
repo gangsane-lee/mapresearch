@@ -3,17 +3,18 @@
 // 데이터: GET /api/compare (기준일 이전 최신 값 + 실효 관측일)
 import { computed, ref, watch } from 'vue';
 import { api } from '../api/client.js';
-import { STATUS, formatMan, formatDeltaMan, isStale } from '../util/format.js';
+import { formatMan, formatDeltaMan, isStale } from '../util/format.js';
 import { rankOf, enumOrd, enumLabel, sparkPath, ageLabel } from '../util/compare.js';
 import { weightedScores, weightsFromSettings } from '../util/score.js';
 import { useComplexesStore } from '../stores/complexes.js';
+import ComplexStateControl from './ComplexStateControl.vue';
 
 const props = defineProps({
   ids: { type: Array, required: true },
   warning: { type: String, default: null },
   reloadKey: { type: Number, default: 0 },
 });
-const emit = defineEmits(['close', 'remove', 'detail', 'new-snapshot']);
+const emit = defineEmits(['close', 'remove', 'detail', 'new-snapshot', 'edit-snapshot', 'history']);
 
 const data = ref(null);
 const error = ref(null);
@@ -43,9 +44,10 @@ const one = computed(() => items.value[0]);
 const enums = computed(() => data.value?.enums ?? []);
 const fieldOf = (cd) => data.value?.fields.find((f) => f.fieldCd === cd);
 const stale = (d) => isStale(d, data.value?.staleDays ?? 30);
-const statusOf = (c) => STATUS[c.status] ?? STATUS.INTEREST;
 const complexStore = useComplexesStore();
 const flagsOf = (id) => complexStore.byId.get(id)?.flags ?? []; // A3 가격 알림 (요약 목록 기준)
+/** ★·상태는 바꾸면 목록(store)에 바로 반영되므로 목록 값을 우선 */
+const live = (item) => complexStore.byId.get(item.complexId) ?? item;
 const v = (item, cd) => item.values[cd]?.value ?? null;
 const obs = (item, cd) => item.values[cd]?.observedAt ?? null;
 /** 최근 실거래: 스냅샷에 기록한 값 우선, 없으면 수집된 실거래(trade 테이블) */
@@ -98,6 +100,22 @@ const rows = computed(() => {
     return s?.score == null ? '-' : `${s.score}점`;
   }, { rank: (i) => scores.get(i.complexId)?.score ?? null, better: 'UP', title: '교통·환경·학군 등급 + 가격 매력도(최저 호가 대비). 가중치는 설정에서 조정' });
 
+  sec('가격');
+  numRow('price_ask', formatMan);
+  row('최근 실거래', (i) => tradeText(lastTrade(i), true), {
+    obs: (i) => lastTrade(i)?.observedAt ?? null,
+  });
+  row('호가 괴리율', (i) => pct(i.derived.gapPct), { rank: (i) => i.derived.gapPct, better: 'DOWN', cls: (i) => signCls(i.derived.gapPct) });
+  if (data.value.budgetMan != null) {
+    row('예산 대비', (i) => (i.derived.budgetDiff == null ? '-' : `${i.derived.budgetDiff > 0 ? '+' : ''}${formatMan(i.derived.budgetDiff)}`), {
+      rank: (i) => i.derived.budgetDiff,
+      better: 'DOWN',
+      cls: (i) => signCls(i.derived.budgetDiff),
+    });
+  }
+  row('직전 대비', (i) => formatDeltaMan(i.derived.askDelta) || '-', { cls: (i) => signCls(i.derived.askDelta) });
+
+
   sec('기본정보');
   row('위치', (i) => i.sggNm ?? '-');
   row('연식', (i) => ageLabel(i.master.useAprDay), { rank: (i) => (i.master.useAprDay ? Number(i.master.useAprDay.slice(0, 4)) : null), better: 'UP' });
@@ -138,21 +156,6 @@ const rows = computed(() => {
   grade('grade_edu');
   numRow('edu_academy_cnt', (x) => `${x}개`);
 
-  sec('가격');
-  numRow('price_ask', formatMan);
-  row('최근 실거래', (i) => tradeText(lastTrade(i), true), {
-    obs: (i) => lastTrade(i)?.observedAt ?? null,
-  });
-  row('호가 괴리율', (i) => pct(i.derived.gapPct), { rank: (i) => i.derived.gapPct, better: 'DOWN', cls: (i) => signCls(i.derived.gapPct) });
-  if (data.value.budgetMan != null) {
-    row('예산 대비', (i) => (i.derived.budgetDiff == null ? '-' : `${i.derived.budgetDiff > 0 ? '+' : ''}${formatMan(i.derived.budgetDiff)}`), {
-      rank: (i) => i.derived.budgetDiff,
-      better: 'DOWN',
-      cls: (i) => signCls(i.derived.budgetDiff),
-    });
-  }
-  row('직전 대비', (i) => formatDeltaMan(i.derived.askDelta) || '-', { cls: (i) => signCls(i.derived.askDelta) });
-
   sec('정비사업');
   row('단계', (i) => enumLabel(enums.value, 'redev_stage', v(i, 'redev_stage')), { obs: (i) => obs(i, 'redev_stage') });
   return R;
@@ -176,7 +179,7 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
     <section v-if="mode === 'SUMMARY' && one" class="summary">
       <div class="hero">
         <div class="hero-meta">
-          <span class="chip status" :style="{ '--dot': statusOf(one).color }">{{ statusOf(one).label }}</span>
+          <ComplexStateControl :complex-id="one.complexId" :status="live(one).status" :is-favorite="!!live(one).isFavorite" dark />
           <span class="sgg">{{ one.sggNm }}</span>
         </div>
         <h3>{{ one.displayNm }}</h3>
@@ -284,10 +287,16 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
       <p class="muted small">초록 = 우세, 빨강 = 열세. 흐린 값은 관측 {{ data.staleDays }}일 경과.</p>
     </section>
 
-    <footer>
-      <button v-if="mode === 'SUMMARY'" type="button" class="btn" @click="emit('new-snapshot', ids[0])">새 스냅샷</button>
-      <a class="btn" :href="`/report/${ids.join(',')}`" target="_blank" rel="noopener">보고서</a>
-      <button type="button" class="btn primary" @click="emit('detail')">{{ mode === 'SUMMARY' ? '상세' : '상세 비교' }}</button>
+    <footer :class="{ two: mode === 'SUMMARY' }">
+      <div v-if="mode === 'SUMMARY'" class="row">
+        <button type="button" class="btn" @click="emit('new-snapshot', ids[0])">새 스냅샷</button>
+        <button type="button" class="btn" title="가장 최근 스냅샷을 고쳐 정정본으로 저장 (보고서 결론 포함)" @click="emit('edit-snapshot', ids[0])">수정</button>
+        <button type="button" class="btn" title="저장한 시각별 스냅샷·보고서" @click="emit('history', ids[0])">이력</button>
+      </div>
+      <div class="row">
+        <a class="btn" :href="`/report/${ids.join(',')}`" target="_blank" rel="noopener">보고서</a>
+        <button type="button" class="btn primary" @click="emit('detail')">{{ mode === 'SUMMARY' ? '상세' : '상세 비교' }}</button>
+      </div>
     </footer>
   </aside>
 </template>
@@ -298,6 +307,10 @@ header, footer { display: flex; align-items: center; gap: 8px; padding: 12px 20p
 header { border-bottom: 1px solid var(--line); }
 header h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); flex: 1; }
 footer { border-top: 1px solid var(--line); margin-top: auto; justify-content: flex-end; background: var(--panel); }
+footer.two { flex-direction: column; align-items: stretch; }
+footer .row { display: flex; gap: 8px; }
+footer.two .row:first-child .btn { flex: 1; text-align: center; }
+footer .row:last-child { flex: 1; }
 footer .btn.primary { flex: 1; text-align: center; }
 section { overflow: auto; }
 section.compare { padding: 16px 20px; }
@@ -308,7 +321,6 @@ section.compare { padding: 16px 20px; }
 /* 히어로: 잉크 바탕에 단지명과 기본 정보 한 줄 */
 .hero { background: var(--ink); color: #fff; padding: 20px 20px 18px; }
 .hero-meta { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgb(255 255 255 / 0.7); }
-.hero .chip.status { background: rgb(255 255 255 / 0.1); border-color: rgb(255 255 255 / 0.2); color: #fff; }
 h3 { margin: 8px 0 16px; font-family: var(--serif); font-size: 25px; font-weight: 700; line-height: 1.3; letter-spacing: -0.03em; }
 .master { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid rgb(255 255 255 / 0.14); padding-top: 12px; }
 .master div + div { border-left: 1px solid rgb(255 255 255 / 0.14); padding-left: 12px; }

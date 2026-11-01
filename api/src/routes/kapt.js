@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { searchKapt, kaptDraft, kaptAt } from '../services/KaptService.js';
-import { reverseGeocode } from '../external/ncpGeocode.js';
+import { reverseGeocode, geocode } from '../external/ncpGeocode.js';
 import { syncTrades } from '../services/TradeSyncService.js';
 import { AppError } from '../util/errors.js';
 
@@ -19,6 +19,13 @@ export function kaptRouter({ getPool, config }) {
     const pool = await getPool();
     const place = await reverseGeocode({ pool, keyId: config?.keys?.ncpKeyId, secret: config?.keys?.ncpClientSecret, lat, lng });
     res.json({ place, candidates: place ? await kaptAt(pool, place) : [] });
+  });
+  /** 주소 → 좌표 후보 (설정의 기준점 좌표 찾기 — 사용자가 누를 때만, 고른 값만 저장) */
+  r.post('/geocode', async (req, res) => {
+    const query = String(req.body?.query ?? '').trim();
+    if (query.length < 2 || query.length > 200) throw new AppError('VALIDATION', '주소를 2자 이상 입력하세요', 400);
+    const pool = await getPool();
+    res.json({ items: await geocode({ pool, keyId: config?.keys?.ncpKeyId, secret: config?.keys?.ncpClientSecret, query }) });
   });
   r.get('/search', async (req, res) => {
     const kind = req.query.kind === 'all' ? null : Number(req.query.kind ?? 1);

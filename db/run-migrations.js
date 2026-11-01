@@ -39,6 +39,7 @@ const pool = await new sql.ConnectionPool({
   user: process.env.MIGRATE_USER,
   password: process.env.MIGRATE_PASSWORD,
   options: { encrypt: true, trustServerCertificate: true, useUTC: false },
+  requestTimeout: 10 * 60 * 1000, // 인덱스 생성 등은 기본 15초를 넘을 수 있다 (메모리가 빠듯한 PC)
 }).connect();
 
 try {

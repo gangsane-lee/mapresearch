@@ -113,7 +113,10 @@ export async function lastTradesByArea(req, complexId, observedAt, areaTypes, to
 }
 
 /** 지역 단위로 공유되는 항목 (같은 법정동이면 대체로 같은 값) */
-export const REGIONAL_FIELDS = ['edu_academy_cnt', 'env_dept', 'env_mart', 'env_hospital', 'env_hazard', 'env_hazard_memo'];
+export const REGIONAL_FIELDS = [
+  'edu_academy_cnt', 'edu_academy_cnt_memo', 'env_dept', 'env_dept_memo', 'env_mart', 'env_mart_memo',
+  'env_hospital', 'env_hospital_memo', 'env_hazard', 'env_hazard_memo', 'env_park',
+];
 
 /** 같은 법정동 다른 단지들의 지역 항목 최신 실제 관측값 (항목별 가장 최근 1건) */
 export async function neighborValues(req, complexId) {

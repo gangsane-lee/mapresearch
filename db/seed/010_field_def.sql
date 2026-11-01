@@ -1,7 +1,8 @@
 /*
   field_def / enum_def — 첨부 임장 보고서 항목 (계획서 §3.2, §3.4, §6)
   seed가 메타데이터의 기준이므로 MATCHED 시 갱신한다.
-  sort는 입력 폼 순서: 교통 → 환경 → 학군 → 가격 → 정비 → 결론
+  sort는 분류 안의 순서. 분류 순서는 화면(snapshotDraft.js CATEGORY_ORDER: 가격 → 교통 → 환경 → 학군 → 정비 → 결론)
+  *_memo 는 같은 이름 항목의 "비고" 칸으로 함께 표시된다 (예: env_dept + env_dept_memo)
 */
 MERGE dbo.field_def AS t
 USING (VALUES
@@ -13,11 +14,16 @@ USING (VALUES
  ('env_hazard',            N'유해시설(반경 3km)', 'ENV',   'bool', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 210),
  ('env_hazard_memo',       N'유해시설 메모',    'ENV',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 220),
  ('env_dept',              N'백화점',           'ENV',     'num',  N'개',  'COMPLEX', 'ABS',  'UP',   1, 0, 230),
+ ('env_dept_memo',         N'백화점 비고',      'ENV',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 231),
  ('env_mart',              N'대형마트',         'ENV',     'num',  N'개',  'COMPLEX', 'ABS',  'UP',   1, 0, 240),
+ ('env_mart_memo',         N'대형마트 비고',    'ENV',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 241),
  ('env_hospital',          N'종합병원',         'ENV',     'num',  N'개',  'COMPLEX', 'ABS',  'UP',   1, 0, 250),
+ ('env_hospital_memo',     N'종합병원 비고',    'ENV',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 251),
+ ('env_park',              N'공원·산책로',      'ENV',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 255),
  ('grade_env',             N'환경 등급',        'ENV',     'enum', NULL,   'COMPLEX', 'NONE', 'UP',   1, 1, 260),
  ('note_env',              N'환경 결론',        'ENV',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 270),
  ('edu_academy_cnt',       N'학원가 수',        'EDU',     'num',  N'개',  'COMPLEX', 'ABS',  'UP',   1, 0, 310),
+ ('edu_academy_cnt_memo',  N'학원가 비고',      'EDU',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 311),
  ('grade_edu',             N'학군 등급',        'EDU',     'enum', NULL,   'COMPLEX', 'NONE', 'UP',   1, 1, 320),
  ('note_edu',              N'학군 결론',        'EDU',     'text', NULL,   'COMPLEX', 'NONE', 'NONE', 1, 0, 330),
  ('price_ask',             N'현재 호가',        'PRICE',   'num',  N'만원', 'AREA',   'BOTH', 'DOWN', 1, 1, 410),

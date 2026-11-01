@@ -41,7 +41,7 @@ function onKey(e) {
     <input
       v-model="query"
       type="search"
-      placeholder="구/시 검색 (예: 관악구, 성남시)"
+      placeholder="구/시 검색 (예: 관악구, 해운대구)  /"
       aria-label="구 또는 시 검색"
       @focus="open = true"
       @input="(open = true), (active = 0)"

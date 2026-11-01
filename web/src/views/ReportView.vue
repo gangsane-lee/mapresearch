@@ -1,5 +1,6 @@
 <script setup>
-// 임장 보고서 (계획서 §10 A5): 첨부 양식 구조 — 기본정보 → 가치평가(교통·환경·학군 + 등급) → 가격 → 부문별 결론 → 종합
+// 임장 보고서 (계획서 §10 A5): 기본정보 → 가격 → 가치평가(교통·환경·학군 + 등급) → 부문별 결론 → 종합
+// 단지 1개면 저장 이력(스냅샷)에서 보고서 시점을 고를 수 있고, "수정"은 지도 화면에서 최근 스냅샷 정정본을 연다.
 // 1개면 단지 보고서, 2~4개면 단지 비교표 + 비교평가 결론. 브라우저 인쇄 → "PDF로 저장"으로 내보낸다.
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
@@ -16,6 +17,7 @@ const data = ref(null);
 const schools = ref(new Map());
 const notes = ref(new Map());
 const error = ref(null);
+const snaps = ref([]); // 단지 1개일 때 보고서 시점 선택용 (무효 제외)
 
 onMounted(async () => {
   try {
@@ -34,12 +36,23 @@ onMounted(async () => {
       }),
     );
     document.title = `임장 보고서 — ${data.value.items.map((x) => x.displayNm).join(' · ')}`;
+    if (ids.length === 1) snaps.value = (await api(`/api/complexes/${ids[0]}/snapshots`)).items;
   } catch (err) {
     error.value = err.message;
   }
 });
 
 const printReport = () => window.print();
+const pad = (n) => String(n).padStart(2, '0');
+const savedAt = (v) => {
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())} 저장`;
+};
+// 같은 관측일 스냅샷이 여럿이면 asOf 하나로 묶인다
+const asOfOptions = computed(() => [...new Map(snaps.value.map((s) => [s.observedAt, s])).values()]);
+function goAsOf(v) {
+  location.href = `/report/${ids.join(',')}${v ? `?asOf=${v}` : ''}`;
+}
 const items = computed(() => data.value?.items ?? []);
 const enums = computed(() => data.value?.enums ?? []);
 const v = (i, cd) => i.values[cd]?.value ?? null;
@@ -52,7 +65,7 @@ const money = (n) => (n == null ? '-' : formatMan(n));
 const signed = (n) => (n == null ? '-' : `${n > 0 ? '+' : ''}${formatMan(n)}`);
 const conveniences = (i) =>
   [['env_dept', '백화점'], ['env_mart', '대형마트'], ['env_hospital', '종합병원']]
-    .map(([cd, l]) => `${l}${v(i, cd) ?? '-'}`)
+    .map(([cd, l]) => `${l}${v(i, cd) ?? '-'}${v(i, `${cd}_memo`) ? `(${v(i, `${cd}_memo`)})` : ''}`)
     .join(', ');
 const commuteText = (i) =>
   i.commutes
@@ -70,6 +83,16 @@ const schoolText = (i) =>
   <div class="report">
     <div class="no-print bar">
       <button type="button" class="btn primary" @click="printReport">인쇄 / PDF로 저장</button>
+      <template v-if="ids.length === 1">
+        <label class="asof">보고서 시점
+          <select :value="asOf ?? ''" @change="goAsOf($event.target.value)">
+            <option value="">최신</option>
+            <option v-for="s in asOfOptions" :key="s.snapshotId" :value="s.observedAt">{{ s.observedAt }} 관측 · {{ savedAt(s.inputAt) }}</option>
+          </select>
+        </label>
+        <a class="btn" :href="`/?edit=${ids[0]}`" title="지도 화면에서 최근 스냅샷을 고쳐 정정본으로 저장">수정</a>
+        <a class="btn" :href="`/?history=${ids[0]}`">저장 이력</a>
+      </template>
       <span class="muted">인쇄 대화상자에서 "PDF로 저장"을 고르면 파일로 내보낼 수 있습니다.</span>
     </div>
     <p v-if="error" class="err">{{ error }}</p>
@@ -95,20 +118,20 @@ const schoolText = (i) =>
           <tr><th>기준점 직선거리</th><td colspan="3">{{ distText(i) }}</td></tr>
         </table>
 
-        <h3>2. 가치평가</h3>
+        <h3>2. 가격 ({{ area(i)?.label ?? '대표 평형' }})</h3>
+        <table>
+          <tr><th>현재 호가</th><td>{{ money(v(i, 'price_ask')) }}</td><th>최근 실거래</th><td>{{ money(v(i, 'price_last_trade')) }} {{ v(i, 'price_last_trade_ym') ? `(${String(v(i, 'price_last_trade_ym')).slice(2, 7).replace('-', '.')})` : '' }}</td></tr>
+          <tr><th>호가 괴리율</th><td>{{ pct(i.derived.gapPct) }}</td><th>예산 대비</th><td>{{ signed(i.derived.budgetDiff) }}</td></tr>
+        </table>
+
+        <h3>3. 가치평가</h3>
         <table>
           <tr><th>교통 <b class="g">{{ grade(i, 'grade_traffic') }}</b></th>
             <td>{{ commuteText(i) }}<br />최근접 역: {{ v(i, 'trn_station') ?? '-' }}{{ v(i, 'trn_station_walk_min') != null ? ` 도보 ${v(i, 'trn_station_walk_min')}분` : '' }}</td></tr>
           <tr><th>환경 <b class="g">{{ grade(i, 'grade_env') }}</b></th>
-            <td>유해시설(반경 3km) {{ v(i, 'env_hazard') == null ? '-' : v(i, 'env_hazard') ? '있음' : '없음' }}{{ v(i, 'env_hazard_memo') ? ` — ${v(i, 'env_hazard_memo')}` : '' }}<br />편의시설: {{ conveniences(i) }}</td></tr>
+            <td>유해시설(반경 3km) {{ v(i, 'env_hazard') == null ? '-' : v(i, 'env_hazard') ? '있음' : '없음' }}{{ v(i, 'env_hazard_memo') ? ` — ${v(i, 'env_hazard_memo')}` : '' }}<br />편의시설: {{ conveniences(i) }}<template v-if="v(i, 'env_park')"><br />공원·산책로: {{ v(i, 'env_park') }}</template></td></tr>
           <tr><th>학군 <b class="g">{{ grade(i, 'grade_edu') }}</b></th>
-            <td>배정 학교: {{ schoolText(i) }}<br />학원가: {{ v(i, 'edu_academy_cnt') ?? '-' }}개</td></tr>
-        </table>
-
-        <h3>3. 가격 ({{ area(i)?.label ?? '대표 평형' }})</h3>
-        <table>
-          <tr><th>현재 호가</th><td>{{ money(v(i, 'price_ask')) }}</td><th>최근 실거래</th><td>{{ money(v(i, 'price_last_trade')) }} {{ v(i, 'price_last_trade_ym') ? `(${String(v(i, 'price_last_trade_ym')).slice(2, 7).replace('-', '.')})` : '' }}</td></tr>
-          <tr><th>호가 괴리율</th><td>{{ pct(i.derived.gapPct) }}</td><th>예산 대비</th><td>{{ signed(i.derived.budgetDiff) }}</td></tr>
+            <td>배정 학교: {{ schoolText(i) }}<br />학원가: {{ v(i, 'edu_academy_cnt') ?? '-' }}개{{ v(i, 'edu_academy_cnt_memo') ? ` — ${v(i, 'edu_academy_cnt_memo')}` : '' }}</td></tr>
         </table>
 
         <h3>4. 부문별 결론</h3>
@@ -127,15 +150,15 @@ const schoolText = (i) =>
         <table>
           <thead><tr><th /><th v-for="i in items" :key="i.complexId">{{ i.displayNm }}</th></tr></thead>
           <tbody>
+            <tr><th>호가</th><td v-for="i in items" :key="i.complexId">{{ money(v(i, 'price_ask')) }}</td></tr>
+            <tr><th>최근 실거래</th><td v-for="i in items" :key="i.complexId">{{ money(v(i, 'price_last_trade')) }}</td></tr>
+            <tr><th>괴리율</th><td v-for="i in items" :key="i.complexId">{{ pct(i.derived.gapPct) }}</td></tr>
+            <tr><th>예산 대비</th><td v-for="i in items" :key="i.complexId">{{ signed(i.derived.budgetDiff) }}</td></tr>
             <tr><th>위치·연식</th><td v-for="i in items" :key="i.complexId">{{ i.sggNm }} · {{ ageLabel(i.master.useAprDay) }}</td></tr>
             <tr><th>세대수·복도</th><td v-for="i in items" :key="i.complexId">{{ i.master.hhldCnt ?? '-' }} · {{ i.master.hallType ?? '-' }}</td></tr>
             <tr><th>교통</th><td v-for="i in items" :key="i.complexId"><b>{{ grade(i, 'grade_traffic') }}</b> {{ commuteText(i) }}</td></tr>
             <tr><th>환경</th><td v-for="i in items" :key="i.complexId"><b>{{ grade(i, 'grade_env') }}</b> {{ conveniences(i) }}</td></tr>
             <tr><th>학군</th><td v-for="i in items" :key="i.complexId"><b>{{ grade(i, 'grade_edu') }}</b> {{ schoolText(i) }}</td></tr>
-            <tr><th>호가</th><td v-for="i in items" :key="i.complexId">{{ money(v(i, 'price_ask')) }}</td></tr>
-            <tr><th>최근 실거래</th><td v-for="i in items" :key="i.complexId">{{ money(v(i, 'price_last_trade')) }}</td></tr>
-            <tr><th>괴리율</th><td v-for="i in items" :key="i.complexId">{{ pct(i.derived.gapPct) }}</td></tr>
-            <tr><th>예산 대비</th><td v-for="i in items" :key="i.complexId">{{ signed(i.derived.budgetDiff) }}</td></tr>
             <tr><th>가중 점수</th><td v-for="i in items" :key="i.complexId">{{ scores.get(i.complexId)?.score ?? '-' }}</td></tr>
           </tbody>
         </table>
@@ -146,7 +169,9 @@ const schoolText = (i) =>
 
 <style scoped>
 .report { max-width: 900px; margin: 0 auto; padding: 24px; background: #fff; color: #111; font-size: 13px; }
-.bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+.bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.asof { display: flex; gap: 6px; align-items: center; font-size: 13px; }
+.asof select { padding: 4px 6px; }
 header { border-bottom: 3px solid #111; margin-bottom: 16px; }
 h1 { font-size: 22px; margin: 0 0 4px; }
 h2 { font-size: 18px; margin: 24px 0 8px; padding: 6px 10px; background: #f1f5f9; border-left: 4px solid #111; }

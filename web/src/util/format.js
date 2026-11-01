@@ -30,7 +30,8 @@ export function isStale(dateStr, staleDays = 30, today = new Date()) {
 }
 
 export const STATUS = {
-  INTEREST: { label: '관심', color: '#7b8494' },
+  // "관심"은 ★ 즐겨찾기(is_favorite)로 쓰므로 첫 단계는 "검토"로 부른다
+  INTEREST: { label: '검토', color: '#7b8494' },
   VISIT_PLANNED: { label: '임장 예정', color: '#4b8aa8' },
   VISITED: { label: '임장 완료', color: '#2b5a96' },
   CANDIDATE: { label: '매수 후보', color: '#2e7552' },
@@ -48,12 +49,13 @@ export function markerHtml(c) {
   const dCls = c.priceAskDelta > 0 ? 'up' : c.priceAskDelta < 0 ? 'down' : '';
   const hasPrice = c.priceAsk != null;
   const name = escapeHtml(c.displayNm);
+  const fav = c.isFavorite ? '<span class="fav" title="관심 단지">★</span>' : '';
   const flag = c.flags?.length ? `<span class="flag" title="${escapeHtml(c.flags.map((f) => f.label).join(', '))}">!</span>` : '';
   const top = hasPrice ? `<b class="amt">${formatMan(c.priceAsk)}</b>` : `<b class="amt nm">${name}</b>`;
   const sub = hasPrice ? `${name}${c.areaLabel ? ` <em>${escapeHtml(c.areaLabel)}</em>` : ''}` : '호가 미입력';
   return (
     `<div class="bubble" style="--st:${st.color}" title="${st.label}">` +
-    `<span class="top">${flag}${top}${delta ? `<i class="${dCls}">${delta}</i>` : ''}</span>` +
+    `<span class="top">${fav}${flag}${top}${delta ? `<i class="${dCls}">${delta}</i>` : ''}</span>` +
     `<span class="sub">${sub}</span>` +
     `</div>`
   );

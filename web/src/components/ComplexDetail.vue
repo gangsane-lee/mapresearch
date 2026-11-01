@@ -5,6 +5,8 @@ import EChart from '../charts/EChart.vue';
 import PhotoGallery from './PhotoGallery.vue';
 import SchoolPanel from './SchoolPanel.vue';
 import RedevRefPanel from './RedevRefPanel.vue';
+import ComplexStateControl from './ComplexStateControl.vue';
+import { useComplexesStore } from '../stores/complexes.js';
 import { priceTrendOption, multiLineOption, gradeTrendOption } from '../charts/options.js';
 import { api } from '../api/client.js';
 import { STATUS, formatMan, formatDeltaMan } from '../util/format.js';
@@ -12,8 +14,15 @@ import { enumLabel, enumOrd, ageLabel } from '../util/compare.js';
 
 const pct = (v) => (v == null ? '-' : `${v}%`);
 
-const props = defineProps({ complexId: { type: Number, required: true } });
-const emit = defineEmits(['correct', 'changed']);
+const props = defineProps({
+  complexId: { type: Number, required: true },
+  /** 이력에서 고른 스냅샷 — 열 때 "스냅샷 이력" 탭에서 바로 보여 준다 */
+  initialSnapshotId: { type: Number, default: null },
+});
+const emit = defineEmits(['correct', 'changed', 'new-snapshot', 'history']);
+const complexStore = useComplexesStore();
+/** ★·상태는 바꾸면 목록(store)에 바로 반영 */
+const live = computed(() => complexStore.byId.get(props.complexId) ?? detail.value);
 
 const TABS = ['개요', '시세 추이', '스냅샷 이력', '가치평가', '실거래', '사진', '정비 타임라인', '메모·결론'];
 const tab = ref(TABS[0]);
@@ -53,12 +62,24 @@ async function load() {
     snapshots.value = sn.items;
     masterDiff.value = md;
     areaTypeId.value ??= d.areaTypes.find((a) => a.isPrimary)?.areaTypeId ?? d.areaTypes[0]?.areaTypeId ?? null;
+    if (!selectedSnap.value) focusSnapshot(props.initialSnapshotId);
   } catch (err) {
     error.value = err.message;
   }
 }
 onMounted(load);
 watch(() => props.complexId, load);
+// 이미 열린 상세에서 이력의 다른 스냅샷을 고른 경우
+watch(() => props.initialSnapshotId, (id) => focusSnapshot(id));
+
+/** 이력에서 고른 스냅샷을 "스냅샷 이력" 탭에서 펼친다 */
+function focusSnapshot(id) {
+  const s = id && snapshots.value.find((x) => x.snapshotId === id);
+  if (!s) return;
+  tab.value = '스냅샷 이력';
+  if (s.voided) showVoided.value = true;
+  selectSnap(s);
+}
 
 const item = computed(() => cmp.value?.items[0]);
 const enums = computed(() => cmp.value?.enums ?? []);
@@ -149,12 +170,46 @@ async function decide(action) {
 }
 
 const SOURCE = { VISIT: '임장', ONLINE: '온라인', AGENT: '중개사' };
+
+// ── 평형 면적을 실거래 실제 면적에 맞추기 (등록 때 평→㎡ 추정값이 달라 시세·실거래가 안 붙는 경우) ──
+const TOL = 0.5;
+const tradeMatch = (a) => (detail.value?.tradeAreas ?? []).find((t) => Math.abs(t.exclM2 - a.exclM2) <= TOL) ?? null;
+const areaChoice = ref({});
+function tradeOptions(a) {
+  return (detail.value?.tradeAreas ?? []).toSorted((x, y) => Math.abs(x.exclM2 - a.exclM2) - Math.abs(y.exclM2 - a.exclM2));
+}
+async function fixArea(a) {
+  const exclM2 = Number(areaChoice.value[a.areaTypeId] ?? tradeOptions(a)[0]?.exclM2);
+  if (!exclM2) return;
+  try {
+    await api(`/api/complexes/${props.complexId}/area-types/${a.areaTypeId}`, { method: 'PATCH', body: { exclM2 } });
+    await load();
+    emit('changed');
+  } catch (err) {
+    error.value = err.message;
+  }
+}
+const pad2 = (n) => String(n).padStart(2, '0');
+function savedAt(v) {
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+const latestActiveId = computed(() => snapshots.value.find((s) => !s.voided)?.snapshotId ?? null);
+const reportUrl = (s) => `/report/${props.complexId}?asOf=${s.observedAt}`;
 defineExpose({ reload: load });
 </script>
 
 <template>
   <div class="detail">
     <p v-if="error" class="err">{{ error }}</p>
+    <div v-if="detail" class="actions">
+      <ComplexStateControl :complex-id="complexId" :status="live.status" :is-favorite="!!live.isFavorite" @changed="emit('changed')" />
+      <span class="spacer" />
+      <button type="button" class="btn" @click="emit('new-snapshot', complexId)">새 스냅샷</button>
+      <button type="button" class="btn" :disabled="!latestActiveId" title="가장 최근 스냅샷을 고쳐 정정본으로 저장" @click="emit('correct', latestActiveId)">최근 스냅샷 수정</button>
+      <button type="button" class="btn" @click="emit('history', complexId)">저장 이력</button>
+      <a class="btn" :href="`/report/${complexId}`" target="_blank" rel="noopener">보고서</a>
+    </div>
     <nav class="tabs" role="tablist">
       <button v-for="t in TABS" :key="t" type="button" role="tab" :aria-selected="tab === t" :class="{ on: tab === t }" @click="tab = t">{{ t }}</button>
     </nav>
@@ -166,7 +221,7 @@ defineExpose({ reload: load });
         <div>
           <h3>단지 정보 <small class="muted">({{ detail.master ? '현재 리비전 #' + detail.master.revId : '없음' }})</small></h3>
           <dl>
-            <dt>상태</dt><dd>{{ STATUS[detail.status]?.label }}</dd>
+            <dt>상태</dt><dd>{{ STATUS[live.status]?.label }}{{ live.isFavorite ? ' · ★ 관심' : '' }}</dd>
             <dt>주소</dt><dd>{{ detail.jibunAddr ?? '-' }}</dd>
             <dt>연식</dt><dd>{{ ageLabel(detail.master?.useAprDay) }}</dd>
             <dt>세대수 / 동</dt><dd>{{ detail.master?.hhldCnt?.toLocaleString() ?? '-' }} / {{ detail.master?.dongCnt ?? '-' }}</dd>
@@ -178,13 +233,26 @@ defineExpose({ reload: load });
           </dl>
           <h3>평형</h3>
           <table class="tbl">
-            <thead><tr><th>라벨</th><th>전용㎡</th><th>방/화</th><th>비고</th><th /></tr></thead>
+            <thead><tr><th>라벨</th><th>전용㎡</th><th>방/화</th><th>비고</th><th /><th>실거래 면적</th></tr></thead>
             <tbody>
               <tr v-for="a in detail.areaTypes" :key="a.areaTypeId">
                 <td>{{ a.label }}</td><td>{{ a.exclM2 }}</td><td>{{ a.rooms ?? '-' }}/{{ a.baths ?? '-' }}</td><td>{{ a.note ?? '' }}</td><td>{{ a.isPrimary ? '대표' : '' }}</td>
+                <td class="trade-area">
+                  <span v-if="tradeMatch(a)" class="ok">✓ {{ tradeMatch(a).cnt }}건</span>
+                  <template v-else-if="detail.tradeAreas?.length">
+                    <select v-model="areaChoice[a.areaTypeId]" :aria-label="`${a.label} 실거래 면적`">
+                      <option v-for="t in tradeOptions(a)" :key="t.exclM2" :value="t.exclM2">{{ t.exclM2 }}㎡ · {{ t.cnt }}건</option>
+                    </select>
+                    <button type="button" class="btn" title="이 평형의 전용㎡를 실거래 면적으로 바꿔 시세·실거래가 붙게 합니다" @click="fixArea(a)">맞추기</button>
+                  </template>
+                  <span v-else class="muted">-</span>
+                </td>
               </tr>
             </tbody>
           </table>
+          <p v-if="detail.tradeAreas?.length && detail.areaTypes.some((a) => !tradeMatch(a))" class="hint">
+            일부 평형의 전용㎡가 실거래 면적과 달라 실거래가 붙지 않습니다(±{{ TOL }}㎡). "맞추기"로 실제 면적을 고르세요.
+          </p>
         </div>
         <div>
           <div v-if="masterDiff?.pendingRevId" class="banner warn">
@@ -238,6 +306,8 @@ defineExpose({ reload: load });
           <ol class="timeline">
             <li v-for="s in visibleSnaps" :key="s.snapshotId" :class="{ on: selectedSnap?.snapshotId === s.snapshotId, voided: s.voided }" @click="selectSnap(s)">
               <b>{{ s.observedAt }}</b> <span class="muted">{{ SOURCE[s.source] }}</span>
+              <small class="muted">저장 {{ savedAt(s.inputAt) }}</small>
+              <small v-if="s.snapshotId === latestActiveId" class="now">최신</small>
               <small class="muted">관측 {{ s.observedCnt }} · 복사 {{ s.carriedCnt }}</small>
               <small v-if="s.supersedesId" class="muted">정정본 (원본 #{{ s.supersedesId }})</small>
               <small v-if="s.voided" class="err">무효: {{ s.voidReason }}</small>
@@ -248,8 +318,11 @@ defineExpose({ reload: load });
         <div v-if="selectedSnap">
           <h3>#{{ selectedSnap.snapshotId }} {{ selectedSnap.observedAt }}</h3>
           <p v-if="selectedSnap.memo">{{ selectedSnap.memo }}</p>
+          <div class="toolbar">
+            <a class="btn" :href="reportUrl(selectedSnap)" target="_blank" rel="noopener">이 시점 보고서</a>
+          </div>
           <div v-if="!selectedSnap.voided" class="toolbar">
-            <button type="button" class="btn" @click="emit('correct', selectedSnap.snapshotId)">정정</button>
+            <button type="button" class="btn primary" @click="emit('correct', selectedSnap.snapshotId)">수정 (정정본 저장)</button>
             <button type="button" class="btn" @click="voidSnap(selectedSnap)">무효화</button>
           </div>
           <template v-if="diff && !diff.error">
@@ -296,10 +369,11 @@ defineExpose({ reload: load });
           <EChart :option="gradeOpt" :empty="!of('grade_traffic').length && !of('grade_env').length && !of('grade_edu').length" empty-text="등급 기록이 없습니다" />
           <h3>환경·학군 (최근)</h3>
           <dl>
-            <template v-for="cd in ['env_hazard', 'env_dept', 'env_mart', 'env_hospital', 'edu_academy_cnt', 'trn_station', 'trn_station_walk_min']" :key="cd">
+            <template v-for="cd in ['env_hazard', 'env_dept', 'env_mart', 'env_hospital', 'env_park', 'edu_academy_cnt', 'trn_station', 'trn_station_walk_min']" :key="cd">
               <dt>{{ labelOf(cd) }}</dt>
               <dd>
                 {{ item?.values[cd]?.value === true ? '있음' : item?.values[cd]?.value === false ? '없음' : (item?.values[cd]?.value ?? '-') }}
+                <span v-if="item?.values[`${cd}_memo`]?.value" class="memo">— {{ item.values[`${cd}_memo`].value }}</span>
                 <small v-if="item?.values[cd]" class="muted">{{ item.values[cd].observedAt }}</small>
               </dd>
             </template>
@@ -362,6 +436,15 @@ defineExpose({ reload: load });
 </template>
 
 <style scoped>
+.memo { color: var(--muted); }
+.trade-area { white-space: nowrap; }
+.trade-area select { font-size: 12px; padding: 2px 4px; margin-right: 4px; }
+.trade-area .btn { padding: 2px 8px; font-size: 12px; }
+.trade-area .ok { color: var(--good); font-size: 12.5px; font-weight: 600; }
+.hint { font-size: 12.5px; color: var(--warn); background: var(--tint-warn); border-radius: 6px; padding: 6px 10px; margin: 6px 0 0; }
+.actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.actions .spacer { flex: 1; }
+.timeline .now { font-size: 11px; color: var(--accent); font-weight: 600; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; flex-wrap: wrap; }
 .tabs button { border: 0; background: none; padding: 8px 12px; border-bottom: 2px solid transparent; color: var(--muted); }
 .tabs button.on { border-color: var(--accent); color: var(--text); font-weight: 600; }

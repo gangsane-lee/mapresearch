@@ -67,6 +67,30 @@ try {
     r.on('info', (i) => console.log(`  ${i.message}`));
     await r.batch(b);
   }
+  // 다른 PC의 백업을 복원한 DB 정리: 로그인과 끊긴 사용자 다시 연결, 앱 사용자를 aptlog_app_role 에 (002 는 처음 한 번만 돈다)
+  const repair = pool.request();
+  repair.on('info', (i) => console.log(`  ${i.message}`));
+  await repair.batch(`
+    USE [RealtyLog_${envUc}];
+    DECLARE @u sysname;
+    DECLARE c CURSOR LOCAL FAST_FORWARD FOR SELECT name FROM (VALUES (N'aptlog_${envLc}_app'), (N'aptlog_${envLc}_mig')) v(name);
+    OPEN c; FETCH NEXT FROM c INTO @u;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+      IF EXISTS (SELECT 1 FROM sys.database_principals dp JOIN sys.server_principals sp ON sp.name = dp.name
+                 WHERE dp.name = @u AND dp.sid <> sp.sid)
+      BEGIN
+        EXEC (N'ALTER USER ' + QUOTENAME(@u) + N' WITH LOGIN = ' + QUOTENAME(@u));
+        PRINT N'로그인 다시 연결: ' + @u;
+      END
+      FETCH NEXT FROM c INTO @u;
+    END
+    CLOSE c;
+    IF DATABASE_PRINCIPAL_ID(N'aptlog_app_role') IS NOT NULL AND IS_ROLEMEMBER(N'aptlog_app_role', N'aptlog_${envLc}_app') = 0
+    BEGIN
+      ALTER ROLE aptlog_app_role ADD MEMBER [aptlog_${envLc}_app];
+      PRINT N'aptlog_app_role 추가: aptlog_${envLc}_app';
+    END`);
 } finally {
   await pool.close();
 }

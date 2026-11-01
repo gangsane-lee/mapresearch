@@ -12,9 +12,12 @@ backup/
 scripts/service/*.exe
 scripts/service/*.xml
 scripts/service/logs/
-# 로컬 미리보기 설정 (스크래치 경로 포함)
-.claude/launch.json
+# 개발·테스트 환경 파일 (비밀값)
+.env.dev
 .env.test
+.env.*.local
+# Claude Code 개인 설정 (프로젝트 공용 설정 .claude/launch.json 은 커밋)
+.claude/settings.local.json
 
 # 내려받은 원본 데이터 (재배포 금지·대용량)
 /*.csv

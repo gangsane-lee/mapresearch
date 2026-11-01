@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 맵리서치(AptLog) 아이콘: 잉크 바탕 + 황동 지도 핀 안의 아파트 세 동 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#26344a"/>
+      <stop offset="1" stop-color="#151d28"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ecd6a6"/>
+      <stop offset="1" stop-color="#c9a865"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- 바닥 그림자 -->
+  <ellipse cx="256" cy="430" rx="78" ry="14" fill="#000" opacity="0.28"/>
+  <!-- 핀 -->
+  <path d="M256 424 C256 424 386 300 386 210 A130 130 0 0 0 126 210 C126 300 256 424 256 424 Z" fill="url(#pin)"/>
+  <!-- 아파트 세 동 (가운데가 가장 높다) -->
+  <g fill="#1b2430">
+    <rect x="186" y="186" width="40" height="92" rx="5"/>
+    <rect x="236" y="148" width="40" height="130" rx="5"/>
+    <rect x="286" y="198" width="40" height="80" rx="5"/>
+  </g>
+  <!-- 창문 -->
+  <g fill="#ecd6a6" opacity="0.9">
+    <rect x="196" y="200" width="20" height="8" rx="2"/><rect x="196" y="218" width="20" height="8" rx="2"/><rect x="196" y="236" width="20" height="8" rx="2"/><rect x="196" y="254" width="20" height="8" rx="2"/>
+    <rect x="246" y="162" width="20" height="8" rx="2"/><rect x="246" y="180" width="20" height="8" rx="2"/><rect x="246" y="198" width="20" height="8" rx="2"/><rect x="246" y="216" width="20" height="8" rx="2"/><rect x="246" y="234" width="20" height="8" rx="2"/><rect x="246" y="252" width="20" height="8" rx="2"/>
+    <rect x="296" y="212" width="20" height="8" rx="2"/><rect x="296" y="230" width="20" height="8" rx="2"/><rect x="296" y="248" width="20" height="8" rx="2"/>
+  </g>
+  <!-- 땅선 -->
+  <rect x="172" y="278" width="168" height="8" rx="4" fill="#1b2430"/>
+</svg>

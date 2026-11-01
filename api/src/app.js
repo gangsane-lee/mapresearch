@@ -7,6 +7,7 @@ import { AppError } from './util/errors.js';
 import { localDateTime } from './db/tx.js';
 import { requireToken } from './middleware/auth.js';
 import { healthRouter } from './routes/health.js';
+import { commuteRouter } from './routes/commute.js';
 import { quotaRouter } from './routes/quota.js';
 import { publicConfigRouter } from './routes/publicConfig.js';
 import { complexesRouter } from './routes/complexes.js';
@@ -56,6 +57,7 @@ export function createApp({ config, getPool, webDist = defaultWebDist }) {
   app.use('/api/visits', visitsRouter({ getPool }));
   app.use('/api/redev-refs', redevRouter({ getPool }));
   app.use('/api/kapt', kaptRouter({ getPool, config }));
+  app.use('/api/commute', commuteRouter({ getPool, config }));
   app.use('/api/sync', syncRouter({ getPool, config }));
   app.use('/api/media', mediaApiRouter({ getPool, config }));
   app.use('/media', mediaFileRouter({ getPool, config }));

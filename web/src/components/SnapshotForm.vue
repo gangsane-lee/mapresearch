@@ -37,14 +37,42 @@ const head = reactive({ observedAt: today, source: 'VISIT', memo: '', reason: ''
 const enumsOf = (fieldCd) => draft.value.enums.filter((e) => e.fieldCd === fieldCd);
 const areaLabel = (id) => draft.value.areaTypes.find((a) => a.areaTypeId === id)?.label ?? '';
 
+/** "항목_memo" 는 같은 항목의 비고 칸으로 붙인다 */
+const memoOf = (r) => state.value.rows.find((x) => x.field.fieldCd === `${r.field.fieldCd}_memo` && x.areaTypeId === r.areaTypeId) ?? null;
+const isPairedMemo = (r) =>
+  r.field.fieldCd.endsWith('_memo') && state.value.rows.some((x) => `${x.field.fieldCd}_memo` === r.field.fieldCd && x.areaTypeId === r.areaTypeId);
+
 const groups = computed(() => {
   if (!state.value) return [];
-  return CATEGORY_ORDER.map(([cat, label]) => ({
-    cat,
-    label,
-    rows: state.value.rows.filter((r) => r.field.category === cat),
-  })).filter((g) => g.rows.length || g.cat === 'TRAFFIC');
+  return CATEGORY_ORDER.map(([cat, label]) => {
+    const rows = state.value.rows.filter((r) => r.field.category === cat && !isPairedMemo(r));
+    return { cat, label, rows, withMemo: rows.some((r) => memoOf(r)) };
+  }).filter((g) => g.rows.length || g.cat === 'TRAFFIC');
 });
+
+// ── 기준 역 대중교통 소요시간 자동 계산 (카카오 대중교통 — 누를 때만 호출, 결과는 제안값) ──
+const suggesting = ref(false);
+const suggestMsg = ref(null);
+async function suggestCommutes() {
+  suggesting.value = true;
+  suggestMsg.value = null;
+  try {
+    const r = await api('/api/commute/suggest', { method: 'POST', body: { complexId: props.complexId } });
+    let n = 0;
+    for (const s of r.items) {
+      const c = state.value.commutes.find((x) => x.anchor.anchorId === s.anchorId);
+      if (!c) continue;
+      Object.assign(c, { minutes: String(s.minutes), transfers: String(s.transfers ?? ''), routeDesc: s.routeDesc ?? '', suggestedMinutes: s.minutes, suggested: true });
+      n++;
+    }
+    const fails = r.errors?.length ? ` · 실패 ${r.errors.map((e) => `${e.anchorName}: ${e.message}`).join(', ')}` : '';
+    suggestMsg.value = `${n}곳 계산됨 (카카오 대중교통 최단 경로, 확인 후 저장)${fails}`;
+  } catch (err) {
+    suggestMsg.value = err.message;
+  } finally {
+    suggesting.value = false;
+  }
+}
 
 const errors = computed(() => (state.value ? rowErrors(state.value) : []));
 
@@ -110,7 +138,7 @@ onMounted(load);
 </script>
 
 <template>
-  <Modal :title="correctOf ? `스냅샷 정정 #${correctOf}` : `새 스냅샷 — ${draft?.displayNm ?? ''}`" size="lg" @close="emit('close')">
+  <Modal :title="correctOf ? `스냅샷 수정 — 정정본 저장 (원본 #${correctOf})` : `새 스냅샷 — ${draft?.displayNm ?? ''}`" size="lg" resizable="snapshot" @close="emit('close')">
     <p v-if="!state && !error" class="muted">불러오는 중…</p>
     <template v-if="state">
       <div v-if="draft.pendingMasterRevId" class="banner warn">
@@ -142,8 +170,17 @@ onMounted(load);
         <span>용적률 {{ draft.master.far_ratio ?? '-' }}%</span>
       </section>
 
-      <section v-for="g in groups" :key="g.cat" class="group">
-        <h3>{{ g.label }}</h3>
+      <section v-for="g in groups" :key="g.cat" class="group" :class="{ 'with-memo': g.withMemo }">
+        <h3>
+          {{ g.label }}
+          <template v-if="g.cat === 'TRAFFIC'">
+            <button type="button" class="btn suggest" :disabled="suggesting" title="기준점(설정의 지하철역 등)까지 대중교통 최단 시간을 카카오 경로로 계산해 채웁니다" @click="suggestCommutes">
+              {{ suggesting ? '계산 중…' : '기준 역 대중교통 시간 자동 계산' }}
+            </button>
+            <small v-if="suggestMsg" class="muted">{{ suggestMsg }}</small>
+          </template>
+        </h3>
+        <div v-if="g.withMemo" class="memo-head" aria-hidden="true"><span>항목</span><span>값</span><span>비고</span></div>
 
         <table v-if="g.cat === 'TRAFFIC'" class="commute">
           <thead>
@@ -154,6 +191,7 @@ onMounted(load);
               <th scope="row">{{ c.anchor.name }}</th>
               <td>
                 <input v-model="c.minutes" inputmode="numeric" class="num" :aria-label="`${c.anchor.name} 소요시간`" />
+                <span v-if="c.suggested && String(c.minutes) === String(c.suggestedMinutes)" class="badge prefill" title="카카오 대중교통 제안값 — 맞으면 그대로 저장">제안</span>
                 <span v-if="c.carriedFromCommuteId && c.original && String(c.minutes) === String(c.original.minutes)" class="badge" :title="`원 관측일 ${c.carriedObservedAt}`">복사</span>
               </td>
               <td><input v-model="c.transfers" inputmode="numeric" class="num" :aria-label="`${c.anchor.name} 환승`" /></td>
@@ -208,6 +246,15 @@ onMounted(load);
               괴리율 {{ gapOf(r.areaTypeId) > 0 ? '+' : '' }}{{ gapOf(r.areaTypeId) }}%
             </small>
           </div>
+          <input
+            v-if="memoOf(r)"
+            v-model="memoOf(r).input"
+            class="memo"
+            maxlength="300"
+            :placeholder="r.field.fieldCd === 'env_hazard' ? '시설 이름·거리' : '이름·거리·특이사항'"
+            :aria-label="`${r.field.label} 비고`"
+          />
+          <span v-else-if="g.withMemo" />
         </div>
       </section>
     </template>
@@ -243,8 +290,13 @@ textarea { width: 100%; resize: vertical; }
 .master { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); margin: 12px 0; }
 .master h3 { width: 100%; margin: 0; font-size: 14px; }
 .group { margin-top: 18px; }
-.group h3 { font-size: 15px; margin: 0 0 8px; border-bottom: 2px solid var(--text); padding-bottom: 4px; }
+.group h3 { display: flex; align-items: center; gap: 10px; font-size: 15px; margin: 0 0 8px; border-bottom: 2px solid var(--text); padding-bottom: 4px; }
+.group h3 small { font-weight: 400; font-size: 12px; }
+.btn.suggest { margin-left: auto; font-size: 12.5px; padding: 3px 10px; }
 .row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.with-memo .row { grid-template-columns: 180px minmax(0, 1fr) minmax(200px, 0.9fr); }
+.memo-head { display: grid; grid-template-columns: 180px minmax(0, 1fr) minmax(200px, 0.9fr); gap: 12px; padding: 0 4px 4px; font-size: 12px; color: var(--muted); }
+.row .memo { width: 100%; }
 .row.changed { background: var(--tint-warn); }
 .control { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .control > input:not([type='checkbox']):not([type='radio']), .control > select { min-width: 200px; }

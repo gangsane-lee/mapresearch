@@ -8,8 +8,9 @@ import CompareDetail from './CompareDetail.vue';
 const props = defineProps({
   ids: { type: Array, required: true },
   names: { type: Array, default: () => [] },
+  initialSnapshotId: { type: Number, default: null },
 });
-const emit = defineEmits(['close', 'correct', 'changed']);
+const emit = defineEmits(['close', 'correct', 'changed', 'new-snapshot', 'history']);
 const detail = ref(null);
 const title = computed(() => (props.ids.length === 1 ? props.names[0] ?? '단지 상세' : `상세 비교 — ${props.names.join(' · ')}`));
 defineExpose({ reload: () => detail.value?.reload?.() });
@@ -17,7 +18,16 @@ defineExpose({ reload: () => detail.value?.reload?.() });
 
 <template>
   <Modal :title="title" size="xl" @close="emit('close')">
-    <ComplexDetail v-if="ids.length === 1" ref="detail" :complex-id="ids[0]" @correct="(id) => emit('correct', id)" @changed="emit('changed')" />
+    <ComplexDetail
+      v-if="ids.length === 1"
+      ref="detail"
+      :complex-id="ids[0]"
+      :initial-snapshot-id="initialSnapshotId"
+      @correct="(id) => emit('correct', id)"
+      @changed="emit('changed')"
+      @new-snapshot="(id) => emit('new-snapshot', id)"
+      @history="(id) => emit('history', id)"
+    />
     <CompareDetail v-else :ids="ids" />
   </Modal>
 </template>

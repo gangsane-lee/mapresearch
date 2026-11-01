@@ -69,7 +69,7 @@ export async function updateSettings(pool, body) {
 
 const anchorInput = z.object({
   name: z.string().min(1).max(50),
-  kind: z.enum(['CBD', 'WORK']),
+  kind: z.enum(['CBD', 'WORK', 'HOME']),
   lat: z.number().min(33).max(39).nullish(),
   lng: z.number().min(124).max(132).nullish(),
   sort: z.number().int().min(0).max(10000).default(0),

@@ -139,15 +139,19 @@ export class NaverMapAdapter {
     this.map = null;
   }
 
-  setCenter({ lat, lng }, zoom) {
+  /** offsetX: 지도 위에 떠 있는 패널만큼 보이는 영역의 가운데로 (px, 양수 = 오른쪽으로 비켜 보이게) */
+  setCenter({ lat, lng }, zoom, { offsetX = 0 } = {}) {
     const pos = new this.n.LatLng(lat, lng);
     if (zoom != null) this.map.morph(pos, zoom);
     else this.map.panTo(pos);
+    if (offsetX) this.n.Event.once(this.map, 'idle', () => this.map.panBy(new this.n.Point(-offsetX / 2, 0)));
   }
 
+  /** padding: 숫자(사방 같음) 또는 { top, right, bottom, left } */
   fitBounds([minLng, minLat, maxLng, maxLat], padding = 40) {
     const b = new this.n.LatLngBounds(new this.n.LatLng(minLat, minLng), new this.n.LatLng(maxLat, maxLng));
-    this.map.fitBounds(b, { top: padding, right: padding, bottom: padding, left: padding });
+    const p = typeof padding === 'number' ? { top: padding, right: padding, bottom: padding, left: padding } : { top: 40, right: 40, bottom: 40, left: 40, ...padding };
+    this.map.fitBounds(b, p);
   }
 
   setMask(geometry) {
@@ -236,6 +240,21 @@ export class NaverMapAdapter {
 
   onMapRightClick(handler) {
     this.mapRightClick = handler;
+  }
+
+  setMapType(type) {
+    const id = this.n?.MapTypeId?.[type];
+    if (id) this.map?.setMapTypeId(id);
+  }
+
+  /** 지적편집도(필지 경계·용도지역)·실시간 교통 레이어 켜고 끄기 */
+  setLayer(name, on) {
+    if (!this.map) return;
+    this.layers ??= {};
+    const Ctor = { cadastral: this.n.CadastralLayer, traffic: this.n.TrafficLayer }[name];
+    if (!Ctor) return;
+    this.layers[name] ??= new Ctor();
+    this.layers[name].setMap(on ? this.map : null);
   }
 
   #wrap({ html, dimmed, selected }) {

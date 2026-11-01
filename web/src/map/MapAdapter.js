@@ -5,9 +5,9 @@
 // interface MapAdapter {
 //   mount(el: HTMLElement, opts: { center: {lat,lng}, zoom: number }): Promise<void>
 //   destroy(): void
-//   setCenter(pos: {lat,lng}, zoom?: number): void
+//   setCenter(pos: {lat,lng}, zoom?: number, opts?: { offsetX?: number }): void   // offsetX = 지도 위 패널 폭
 //   resize(): void                                                  // 컨테이너 크기 변경 후
-//   fitBounds(bbox: number[], padding?: number): void
+//   fitBounds(bbox: number[], padding?: number | {top,right,bottom,left}): void
 //   setMask(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon | null): void   // null = 해제
 //   addMarker(m: { id, position: {lat,lng}, html: string, dimmed?: boolean }): void
 //   updateMarker(id, patch: { html?: string, dimmed?: boolean, selected?: boolean }): void
@@ -17,6 +17,8 @@
 //   onMapClick(handler: (pos: {lat,lng}) => void): void
 //   onAreaSelect(handler: (bounds: {minLat,minLng,maxLat,maxLng}) => void): void   // Ctrl(⌘)+드래그 사각형
 //   onMapRightClick(handler: (pos: {lat,lng}, point: {x,y}) => void): void         // point = 지도 요소 기준 px
+//   setMapType(type: 'NORMAL' | 'SATELLITE' | 'HYBRID' | 'TERRAIN'): void
+//   setLayer(name: 'cadastral' | 'traffic', on: boolean): void                     // 지적편집도·실시간 교통
 // }
 
 /**
@@ -77,6 +79,8 @@ export class NullMapAdapter {
   onMapClick() {}
   onAreaSelect() {} // 목록 모드에는 영역이 없다 (Ctrl+클릭으로 다중 선택)
   onMapRightClick() {}
+  setMapType() {}
+  setLayer() {}
 
   #render() {
     if (!this.list) return;

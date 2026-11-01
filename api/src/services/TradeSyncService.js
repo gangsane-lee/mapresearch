@@ -20,12 +20,23 @@ export function recentMonths(n, now = new Date()) {
   return out;
 }
 
-/** 시군구의 법정동명 → 법정동코드 (kapt_ref 기준). 같은 이름이 여러 코드면 제외 */
-async function umdMap(pool, sigunguCd) {
-  const r = await pool
-    .request()
-    .input('g', sql.Char(5), sigunguCd)
-    .query(`SELECT umd_nm, MIN(bjd_cd) AS bjd_cd FROM dbo.kapt_ref WHERE sigungu_cd = @g
+/**
+ * 행정구역 개편으로 이어진 코드 묶음 (region_code_map): 41597 → [41597, 41590], 41590 → [41590, 41591, …]
+ * 실거래는 새 코드로 오고 단지 식별정보·등록 단지는 옛 코드일 수 있어, 법정동 찾기와 단지 연결은 묶음 전체로 한다.
+ */
+export async function relatedCodes(pool, sigunguCd) {
+  const r = await pool.request().input('g', sql.Char(5), sigunguCd).query(`
+    SELECT prev_lawd_cd AS cd FROM dbo.region_code_map WHERE lawd_cd = @g AND prev_lawd_cd IS NOT NULL
+    UNION SELECT lawd_cd FROM dbo.region_code_map WHERE prev_lawd_cd = @g`);
+  return [sigunguCd, ...r.recordset.map((x) => x.cd).filter((c) => c !== sigunguCd)];
+}
+
+const inList = (req, codes) => codes.map((c, i) => (req.input(`cd${i}`, sql.Char(5), c), `@cd${i}`)).join(', ');
+
+/** 시군구(코드 묶음)의 법정동명 → 법정동코드 (kapt_ref 기준). 같은 이름이 여러 코드면 제외 */
+async function umdMap(pool, codes) {
+  const req = pool.request();
+  const r = await req.query(`SELECT umd_nm, MIN(bjd_cd) AS bjd_cd FROM dbo.kapt_ref WHERE sigungu_cd IN (${inList(req, codes)})
             GROUP BY umd_nm HAVING COUNT(DISTINCT bjd_cd) = 1`);
   return new Map(r.recordset.map((x) => [x.umd_nm, x.bjd_cd]));
 }
@@ -121,16 +132,18 @@ async function upsertRents(req, rows) {
  *   2) 이름이 달라도, 그 필지에 등록 단지가 하나이고 거래 단지명도 한 종류뿐이면 연결
  * 그 밖은 연결하지 않는다 (unlinked 로 보고).
  */
-export async function linkTrades(pool, sigunguCd) {
+export async function linkTrades(pool, sigunguCd, codes = [sigunguCd]) {
   const out = {};
   for (const tbl of ['trade', 'trade_rent']) {
-    const r = await pool.request().input('g', sql.Char(5), sigunguCd).query(`
+    const req = pool.request().input('g', sql.Char(5), sigunguCd);
+    const cds = inList(req, codes);
+    const r = await req.query(`
       WITH cx AS (
         SELECT c.complex_id, c.bjd_cd, c.jibun, c.display_nm, k.nm_price, k.nm_bld, k.nm_road
         FROM dbo.complex c
         LEFT JOIN dbo.complex_ext_id x ON x.complex_id = c.complex_id AND x.source = 'KAPT' AND x.valid_to IS NULL
         LEFT JOIN dbo.kapt_ref k ON k.danji_id = x.ext_id
-        WHERE c.sigungu_cd = @g AND c.bjd_cd IS NOT NULL AND c.jibun IS NOT NULL),
+        WHERE c.sigungu_cd IN (${cds}) AND c.bjd_cd IS NOT NULL AND c.jibun IS NOT NULL),
       site AS (SELECT bjd_cd, jibun, COUNT(*) AS n FROM cx GROUP BY bjd_cd, jibun),
       tn AS (SELECT bjd_cd, jibun, COUNT(DISTINCT apt_nm) AS names FROM dbo.${tbl} WHERE sigungu_cd = @g GROUP BY bjd_cd, jibun)
       UPDATE t SET complex_id = cx.complex_id
@@ -158,7 +171,19 @@ export async function linkTrades(pool, sigunguCd) {
 export async function syncTrades(pool, { serviceKey, sigunguCd, months = 3, kinds = ['SALE', 'RENT'], now, fetchMonth = realFetchMonth }) {
   if (!/^\d{5}$/.test(sigunguCd ?? '')) throw new AppError('VALIDATION', 'sigunguCd 는 5자리', 400);
   if (!Number.isInteger(months) || months < 1 || months > 36) throw new AppError('VALIDATION', 'months 는 1~36', 400);
-  const umd = await umdMap(pool, sigunguCd);
+  // 개편으로 없어진 옛 코드(예: 화성시 41590)는 실거래 API가 새 구 코드로만 응답한다 → 새 코드마다 받는다
+  const succ = (
+    await pool.request().input('g', sql.Char(5), sigunguCd).query('SELECT lawd_cd FROM dbo.region_code_map WHERE prev_lawd_cd = @g AND valid_to IS NULL ORDER BY lawd_cd')
+  ).recordset.map((x) => x.lawd_cd);
+  if (succ.length) {
+    const parts = [];
+    for (const cd of succ) parts.push(await syncTrades(pool, { serviceKey, sigunguCd: cd, months, kinds, now, fetchMonth }));
+    const linked = {};
+    for (const p of parts) for (const [k, v] of Object.entries(p.linked)) linked[k] = (linked[k] ?? 0) + v;
+    return { sigunguCd, via: succ, results: parts.flatMap((p) => p.results.map((x) => ({ ...x, lawdCd: p.sigunguCd }))), linked };
+  }
+  const codes = await relatedCodes(pool, sigunguCd);
+  const umd = await umdMap(pool, codes);
   const results = [];
   for (const ym of recentMonths(months, now)) {
     for (const kind of kinds) {
@@ -174,12 +199,16 @@ export async function syncTrades(pool, { serviceKey, sigunguCd, months = 3, kind
       });
     }
   }
-  const linked = await linkTrades(pool, sigunguCd);
+  const linked = await linkTrades(pool, sigunguCd, codes);
   return { sigunguCd, results, linked };
 }
 
-/** 배치 대상 시군구: 등록된 단지가 있는 곳 (제외 상태 제외) */
+/** 배치 대상 시군구: 등록된 단지가 있는 곳 (제외 상태 제외). 개편된 옛 코드는 실거래 API가 쓰는 새 코드들로 바꾼다 */
 export async function targetSigungus(pool) {
-  const r = await pool.request().query("SELECT DISTINCT sigungu_cd FROM dbo.complex WHERE status <> 'EXCLUDED' ORDER BY sigungu_cd");
-  return r.recordset.map((x) => x.sigungu_cd);
+  const r = await pool.request().query(`
+    SELECT DISTINCT COALESCE(m.lawd_cd, c.sigungu_cd) AS cd
+    FROM dbo.complex c
+    LEFT JOIN dbo.region_code_map m ON m.prev_lawd_cd = c.sigungu_cd AND m.valid_to IS NULL
+    WHERE c.status <> 'EXCLUDED' ORDER BY cd`);
+  return r.recordset.map((x) => x.cd);
 }

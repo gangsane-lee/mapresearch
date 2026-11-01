@@ -88,6 +88,32 @@ function addAnchor() {
   anchors.value.push({ anchorId: null, name: '', kind: 'WORK', lat: '', lng: '', sort: (anchors.value.length + 1) * 10, active: true });
 }
 
+const KIND = { HOME: '현재 집', WORK: '직장', CBD: '업무지구·역' };
+
+/** 주소·건물명 → 좌표 후보 (네이버 지오코딩, 쿼터 가드). 고른 후보는 입력칸만 채우고, "저장"을 눌러야 반영 */
+async function findCoord(a) {
+  const query = String(a.q ?? '').trim();
+  if (!query) return;
+  a.searching = true;
+  a.found = null;
+  a.findError = null;
+  try {
+    a.found = (await api('/api/kapt/geocode', { method: 'POST', body: { query } })).items;
+    if (!a.found.length) a.findError = '찾은 주소가 없습니다. 도로명주소나 "동 + 번지"로 다시 입력하세요';
+  } catch (err) {
+    a.findError = err.message;
+  } finally {
+    a.searching = false;
+  }
+}
+function pickCoord(a, f) {
+  a.lat = f.lat;
+  a.lng = f.lng;
+  a.addr = f.roadAddress ?? f.jibunAddress;
+  a.found = null;
+  a.dirty = true;
+}
+
 const API_NAMES = {
   KAKAO_TRANSIT: '카카오 대중교통 (초과 시 유료)',
   NCP_GEOCODE: '네이버 지오코딩',
@@ -163,27 +189,41 @@ const warnRatio = computed(() => Number(settings.quota_warn_ratio ?? 0.7));
     </div>
 
     <section>
-      <h3>기준점 <small class="muted">(직선거리·소요시간 기준, 삭제 대신 비활성)</small></h3>
-      <table class="tbl">
-        <thead><tr><th>이름</th><th>구분</th><th>위도</th><th>경도</th><th>순서</th><th>사용</th><th /></tr></thead>
-        <tbody>
-          <tr v-for="(a, i) in anchors" :key="a.anchorId ?? `new${i}`">
-            <td><input v-model="a.name" maxlength="50" aria-label="기준점 이름" /></td>
-            <td>
-              <select v-model="a.kind" aria-label="구분">
-                <option value="CBD">업무지구</option>
-                <option value="WORK">직장</option>
-              </select>
-            </td>
-            <td><input v-model="a.lat" type="number" step="0.000001" class="m" aria-label="위도" /></td>
-            <td><input v-model="a.lng" type="number" step="0.000001" class="m" aria-label="경도" /></td>
-            <td><input v-model="a.sort" type="number" class="s" aria-label="순서" /></td>
-            <td><input v-model="a.active" type="checkbox" aria-label="사용" /></td>
-            <td><button type="button" class="btn" @click="saveAnchor(a)">저장</button></td>
-          </tr>
-        </tbody>
-      </table>
-      <button type="button" class="btn" @click="addAnchor">기준점 추가</button>
+      <h3>기준점 <small class="muted">현재 집·직장·주요 역 — 단지마다 직선거리와 대중교통 시간(스냅샷 자동 계산)을 잽니다. 삭제 대신 "사용" 해제</small></h3>
+      <div class="anchors">
+        <div v-for="(a, i) in anchors" :key="a.anchorId ?? `new${i}`" class="anchor" :class="{ off: !a.active, missing: a.lat === '' || a.lat == null }">
+          <div class="a-head">
+            <select v-model="a.kind" class="kind" aria-label="구분">
+              <option v-for="(l, k) in KIND" :key="k" :value="k">{{ l }}</option>
+            </select>
+            <input v-model="a.name" maxlength="50" class="name" placeholder="이름 (예: 우리 집, 판교 회사)" aria-label="기준점 이름" />
+            <span class="coord-state">{{ a.lat === '' || a.lat == null ? '좌표 없음' : `${Number(a.lat).toFixed(5)}, ${Number(a.lng).toFixed(5)}` }}</span>
+            <label class="use"><input v-model="a.active" type="checkbox" /> 사용</label>
+            <button type="button" class="btn" :class="{ primary: a.dirty }" @click="saveAnchor(a)">저장</button>
+          </div>
+          <div class="a-find">
+            <input v-model="a.q" placeholder="주소·건물명으로 좌표 찾기 (예: 판교역로 166, 테헤란로 152)" aria-label="주소 검색" @keydown.enter.prevent="findCoord(a)" />
+            <button type="button" class="btn" :disabled="a.searching || !a.q" @click="findCoord(a)">{{ a.searching ? '찾는 중…' : '좌표 찾기' }}</button>
+            <details class="manual">
+              <summary>직접 입력</summary>
+              <input v-model="a.lat" type="number" step="0.000001" class="m" placeholder="위도" aria-label="위도" @input="a.dirty = true" />
+              <input v-model="a.lng" type="number" step="0.000001" class="m" placeholder="경도" aria-label="경도" @input="a.dirty = true" />
+              <input v-model="a.sort" type="number" class="s" aria-label="순서" title="순서" />
+            </details>
+          </div>
+          <ul v-if="a.found?.length" class="found">
+            <li v-for="(f, j) in a.found" :key="j">
+              <button type="button" @click="pickCoord(a, f)">
+                <b>{{ f.roadAddress ?? f.jibunAddress }}</b>
+                <small v-if="f.roadAddress && f.jibunAddress">{{ f.jibunAddress }}</small>
+              </button>
+            </li>
+          </ul>
+          <p v-if="a.addr && a.dirty" class="picked">✓ {{ a.addr }} — "저장"을 눌러 반영</p>
+          <p v-if="a.findError" class="err small">{{ a.findError }}</p>
+        </div>
+      </div>
+      <button type="button" class="btn" @click="addAnchor">＋ 기준점 추가</button>
     </section>
 
     <section>
@@ -201,6 +241,28 @@ const warnRatio = computed(() => Number(settings.quota_warn_ratio ?? 0.7));
 </template>
 
 <style scoped>
+.anchors { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.anchor { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; background: var(--panel); }
+.anchor.missing { border-color: var(--warn-line); background: var(--tint-warn); }
+.anchor.off { opacity: 0.55; }
+.a-head, .a-find { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.a-find { margin-top: 8px; }
+.a-head .kind { width: 112px; }
+.a-head .name { flex: 1; min-width: 160px; font-weight: 600; }
+.coord-state { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 150px; }
+.missing .coord-state { color: var(--warn); font-weight: 600; }
+.use { font-size: 12.5px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
+.a-find > input { flex: 1; min-width: 240px; }
+.manual { font-size: 12.5px; color: var(--muted); }
+.manual summary { cursor: pointer; }
+.manual[open] { display: flex; gap: 6px; align-items: center; }
+.found { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.found li + li { border-top: 1px solid var(--line); }
+.found button { width: 100%; text-align: left; border: 0; background: var(--panel); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+.found button:hover { background: var(--accent-soft); }
+.found small { color: var(--muted); font-size: 12px; }
+.picked { margin: 6px 0 0; font-size: 12.5px; color: var(--good); }
+.small { font-size: 12.5px; margin: 6px 0 0; }
 section { margin-bottom: 20px; }
 h3 { font-size: 15px; margin: 0 0 8px; }
 .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: end; }

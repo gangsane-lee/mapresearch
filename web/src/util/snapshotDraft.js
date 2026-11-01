@@ -2,11 +2,12 @@
 import { parseManwon } from '../../../shared/unit.js';
 import { formatMan } from './format.js';
 
+// 입력 폼 순서 — 가격을 맨 위에 (가장 자주 바뀌고 먼저 확인하는 값)
 export const CATEGORY_ORDER = [
+  ['PRICE', '가격'],
   ['TRAFFIC', '교통'],
   ['ENV', '환경'],
   ['EDU', '학군'],
-  ['PRICE', '가격'],
   ['REDEV', '정비사업'],
   ['NOTE', '종합'],
 ];
@@ -26,7 +27,10 @@ export function fromInput(field, input) {
   if (input === '' || input == null) return { value: null };
   if (isMoney(field)) {
     try {
-      return { value: parseManwon(input) };
+      const value = parseManwon(input);
+      // 아파트 가격이 1,000만원 미만일 리 없다 — "10"을 10억으로 착각해 입력한 경우 (10만원으로 저장되는 실수 방지)
+      if (value > 0 && value < 1000) return { error: `${value}만원? 억 단위면 "${value}억"으로 입력하세요` };
+      return { value };
     } catch (e) {
       return { error: e.message };
     }

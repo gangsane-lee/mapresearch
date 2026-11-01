@@ -1,6 +1,15 @@
-# AptLog
+# AptLog (맵리서치)
 
 아파트 갈아타기를 위한 임장·시세 기록 시스템입니다. 관심 단지를 지도에 등록하고, 방문할 때마다 호가·등급·메모를 **스냅샷**으로 남겨 시간에 따른 변화를 비교합니다. 실거래(국토부)와 단지 식별정보(한국부동산원)는 공공 데이터로 채웁니다.
+
+**주요 기능**
+
+- 지도: 구/시 검색(전국)·경계 강조, 단지 명패 마커, 왼쪽 "내 단지" 목록(검색·정렬·업데이트 필요 표시), 지도 유형·지적편집도·교통 레이어
+- 등록: 지도 우클릭 → 그 위치의 단지 후보(네이버 역지오코딩 + 단지 식별정보) → 단지 추가, Ctrl+드래그 영역 비교
+- 스냅샷: 호가·교통·환경·학군·결론 기록(가격 먼저, 항목별 비고), 직전 값 복사, 수정은 정정본으로(이력 보존), 저장 이력·시점별 보고서
+- 교통: 기준점(현재 집·직장·주요 역)까지 대중교통 시간 자동 계산(카카오), 직선거리
+- 시세: 실거래 매매·전월세 자동 수집(행정구역 개편 코드 대응), 호가 괴리율·가격 알림, 평형 면적을 실거래 면적에 맞추기
+- 판단: ★ 관심·진행 상태, 비교표·가중 점수, **매수 검토**(예산 대비 취득세·중개보수 포함 총 필요 자금), 임장 보고서 인쇄/PDF
 
 - 기준 문서: [APTLOG_DEV_PLAN.md](APTLOG_DEV_PLAN.md) (요구사항·스키마·API·단계)
 - 작업 규칙: [CLAUDE.md](CLAUDE.md) · 진행 현황: [docs/PROGRESS.md](docs/PROGRESS.md)
@@ -58,8 +67,8 @@ docs/       진행 현황, 실제 API 응답 샘플
 
 ```bash
 mkdir -p ~/code && cd ~/code
-git clone https://github.com/gangsane-lee/aptlog.git
-cd aptlog
+git clone https://github.com/gangsane-lee/mapresearch.git
+cd mapresearch
 npm install
 ```
 
@@ -73,28 +82,45 @@ npm install
 mkdir -p ~/AptLogData/media ~/AptLogBackup/{db,media,logs}
 ```
 
-### 4. `.env` 작성
+### 4. `.env` 작성 — 운영(`.env`)과 개발(`.env.dev`) 두 개
+
+맥미니 한 대에서 **운영**(매일 쓰는 실제 데이터, 자동 실행)과 **개발**(코드 수정·시험)을 함께 합니다. DB와 포트를 나눠 서로 영향이 없게 합니다.
+
+| | 운영 `.env` | 개발 `.env.dev` |
+|---|---|---|
+| DB | `RealtyLog_PROD` (`aptlog_prod_app` / `aptlog_prod_mig`) | `RealtyLog_DEV` (`aptlog_dev_app` / `aptlog_dev_mig`) |
+| 서버 | `PORT=5180` — launchd 가 상시 실행, 빌드된 화면 | `PORT=5181` — `npm run dev` 로 띄울 때만, 화면은 Vite `5173` |
+| 주소 | <http://127.0.0.1:5180> | <http://localhost:5173> (저장하면 바로 반영) |
 
 ```bash
 cp .env.example .env
 open -e .env
 ```
 
-텍스트 편집기에서 아래 값을 채우고 저장합니다. `<사용자>`는 `whoami` 로 나오는 맥 계정 이름입니다.
+텍스트 편집기에서 아래 값을 채우고 저장합니다. `<사용자>`는 `whoami` 로 나오는 맥 계정 이름입니다. 다 채운 뒤 개발용을 복사해 DB·포트·로그인만 바꿉니다:
+
+```bash
+cp .env .env.dev
+open -e .env.dev
+```
+
+`.env.dev` 에서 바꿀 값: `PORT=5181`, `DB_NAME=RealtyLog_DEV`, `DB_USER=aptlog_dev_app`, `MIGRATE_USER=aptlog_dev_mig`, 두 비밀번호는 새로 정합니다.
 
 | 키 | 값 |
 |---|---|
-| `DB_NAME` | `RealtyLog_PROD` (실사용) 또는 `RealtyLog_DEV` (연습) |
-| `DB_USER` / `MIGRATE_USER` | PROD면 `aptlog_prod_app` / `aptlog_prod_mig`, DEV면 `aptlog_dev_app` / `aptlog_dev_mig` |
+| `PORT` | 운영 `5180` (개발용 `.env.dev` 는 `5181`) |
+| `DB_NAME` | 운영 `RealtyLog_PROD` (개발용 `.env.dev` 는 `RealtyLog_DEV`) |
+| `DB_USER` / `MIGRATE_USER` | 운영 `aptlog_prod_app` / `aptlog_prod_mig` (개발 `aptlog_dev_app` / `aptlog_dev_mig`) |
 | `DB_PASSWORD` / `MIGRATE_PASSWORD` | 새로 정하는 비밀번호. 12자 이상, `'` `"` `$` 사용 불가 |
 | `MSSQL_SA_PASSWORD` | SQL Server 관리자(sa) 비밀번호. 8자 이상 + 대문자·소문자·숫자·특수문자 중 3종 (`$` 제외 권장) |
 | `MEDIA_ROOT` | `/Users/<사용자>/AptLogData/media` |
 | `BACKUP_ROOT` | `/Users/<사용자>/AptLogBackup` |
 | `BACKUP_SQL_DIR` | `/var/opt/mssql/backup` (그대로) |
 | `DATA_GO_KR_KEY` | 공공데이터포털 인증키 (실거래 동기화) |
+| `KAKAO_REST_KEY` | 카카오 개발자 REST API 키 (스냅샷의 기준 역 대중교통 시간 자동 계산). [카카오 개발자](https://developers.kakao.com) › 내 애플리케이션 › 앱 만들기 → 앱 키의 REST API 키, 제품 설정에서 **카카오맵 사용 설정**을 켭니다. 계정의 첫 번째 활성 앱이어야 무료 한도(일 1,000건)가 적용됩니다 |
 | `NCP_KEY_ID` / `NCP_CLIENT_SECRET` | 네이버 클라우드 Maps Application 키 (지도·우클릭 주소) |
 
-`.env` 는 비밀값이 들어 있어 Git에 올라가지 않습니다(`.gitignore`). 다른 곳에 복사하지 마세요.
+`.env`·`.env.dev`·`.env.test` 는 비밀값이 들어 있어 Git에 올라가지 않습니다(`.gitignore`). **저장소는 공개(public)**이므로 키·비밀번호를 코드나 문서에 절대 적지 마세요.
 
 ### 5. SQL Server 실행 (Docker)
 
@@ -119,10 +145,14 @@ source .env && sqlcmd -S 127.0.0.1 -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "SELECT @
 ### 6. DB·로그인 만들기, 스키마 적용
 
 ```bash
-npm run db:setup     # RealtyLog_{DEV|PROD} DB + aptlog_*_app / aptlog_*_mig 로그인 (재실행해도 안전)
-npm run migrate      # 테이블·뷰·권한 + 기본 데이터(seed: 항목 정의·기준점·시군구 경계)
+npm run db:setup         # 운영: RealtyLog_PROD + aptlog_prod_* 로그인 (재실행해도 안전)
+npm run migrate          # 운영: 테이블·뷰·권한 + 기본 데이터(seed: 항목 정의·기준점·시군구 경계·행정구역 코드 대응)
+npm run db:setup:dev     # 개발: RealtyLog_DEV + aptlog_dev_*
+npm run migrate:dev      # 개발
 npm run migrate:status
 ```
+
+`db:setup` 은 다른 PC 백업을 복원한 DB의 끊긴 로그인 연결과 앱 권한(role)도 함께 바로잡습니다.
 
 `migrate:status` 에서 모든 파일이 `적용` 이면 됩니다. 행정경계(`web/public/geo`)와 시군구 seed는 저장소에 들어 있어 따로 빌드할 필요가 없습니다.
 
@@ -159,7 +189,11 @@ npm start            # API + 화면 서버
 ```
 http://127.0.0.1:5180
 http://localhost:5180
+http://127.0.0.1:5173
+http://localhost:5173
 ```
+
+5173 은 개발 화면입니다. 지도 인증은 화면 주소 기준이라 개발 API 포트 5181 은 등록하지 않아도 됩니다.
 
 일·월 이용 한도(쿼터)는 콘솔과 앱 설정 화면 양쪽에서 무료 한도보다 낮게 유지합니다.
 
@@ -181,7 +215,7 @@ bash scripts/mac/install-launchd.sh
 - 로그: `~/Library/Logs/AptLog/`
 - 지금 바로 한 번 실행: `launchctl kickstart gui/$(id -u)/com.aptlog.backup`
 - 해제: `bash scripts/mac/install-launchd.sh --uninstall`
-- 코드를 업데이트한 뒤에는 `npm install && npm run migrate && npm run build` 후 `launchctl kickstart -k gui/$(id -u)/com.aptlog.api` 로 서버를 다시 시작합니다.
+- 코드를 업데이트한 뒤에는 `npm install && npm run backup && npm run migrate && npm run build` 후 `launchctl kickstart -k gui/$(id -u)/com.aptlog.api` 로 서버를 다시 시작합니다 (자세한 순서는 "개발과 운영").
 - 맥이 **잠자기** 중이면 깨어난 뒤 실행되지만, **전원이 꺼져** 있던 동안의 일정은 건너뜁니다. 시스템 설정 › 에너지 에서 "디스플레이가 꺼져 있을 때 자동으로 잠자기 방지"를 켜 두면 안정적입니다.
 
 ### 설치 점검 (`npm run check`)
@@ -261,7 +295,9 @@ SELECT COUNT(*) AS complexes FROM RealtyLog_RestoreTest.dbo.complex;"
 
 윈도우에서 이미 기록한 데이터가 있을 때만 합니다. 새로 시작하면 건너뜁니다.
 
-1. **윈도우**에서 백업: `powershell -ExecutionPolicy Bypass -File scripts\backup.ps1` → `C:\AptLogBackup\db\RealtyLog_PROD_yyyyMMdd.bak`
+> **2026-11 현재 실데이터는 윈도우 PC의 `RealtyLog_DEV`** 에 있습니다(등록 단지·스냅샷·실거래·단지 식별정보 46,385개). 그래서 받는 파일은 `RealtyLog_DEV_yyyyMMdd.bak` 입니다. 맥에서는 이 파일 하나를 **운영 DB(`RealtyLog_PROD`)로 복원**하고, 같은 파일을 **개발 DB(`RealtyLog_DEV`)로도 한 번 더 복원**합니다. 아래 예시의 파일명·`MOVE` 의 논리 이름은 `RESTORE FILELISTONLY` 결과대로 바꿉니다(이 경우 `RealtyLog_DEV` / `RealtyLog_DEV_log`).
+
+1. **윈도우**에서 백업: 프로젝트 폴더에서 `npm run backup` (또는 `scripts\backup.ps1`) → `C:\AptLogBackup\db\RealtyLog_DEV_yyyyMMdd.bak`
 2. 그 `.bak` 파일과 `C:\AptLogData\media` 폴더를 USB 등으로 맥에 복사:
    - `.bak` → `~/AptLogBackup/db/`
    - `media` 안의 내용 → `~/AptLogData/media/`
@@ -278,27 +314,43 @@ SELECT COUNT(*) AS complexes FROM RealtyLog_RestoreTest.dbo.complex;"
      MOVE N'RealtyLog_PROD_log' TO N'/var/opt/mssql/data/RealtyLog_PROD_log.ldf';"
    ```
 
-4. 로그인 만들기 + 끊긴 사용자 다시 연결 (서버가 바뀌면 로그인 ID가 달라져 연결이 끊깁니다):
+   개발 DB도 같은 파일로: 위 명령의 `[RealtyLog_PROD]` 와 `.mdf`/`.ldf` 이름을 `RealtyLog_DEV` 로 바꿔 한 번 더 실행합니다.
+
+4. 로그인 만들기 + 끊긴 사용자 다시 연결 + 앱 권한 — `db:setup` 이 한 번에 처리합니다:
 
    ```bash
-   npm run db:setup
-   sqlcmd -S 127.0.0.1 -U sa -P "$MSSQL_SA_PASSWORD" -C -d RealtyLog_PROD -Q "
-   ALTER USER [aptlog_prod_app] WITH LOGIN = [aptlog_prod_app];
-   ALTER USER [aptlog_prod_mig] WITH LOGIN = [aptlog_prod_mig];"
-   npm run migrate
+   npm run db:setup && npm run migrate              # 운영 DB
+   npm run db:setup:dev && npm run migrate:dev      # 개발 DB
+   npm run check
    ```
 
 5. 7단계(단지 식별정보)는 이미 DB에 들어 있으므로 건너뛰고 8단계부터 진행합니다.
 
 ---
 
-## 개발
+## 개발과 운영 (한 맥미니에서)
+
+평소에는 운영 서버(launchd, 5180)가 늘 떠 있고, 고칠 때만 개발 서버를 따로 띄웁니다.
 
 ```bash
-npm run dev:api      # API (파일 바뀌면 자동 재시작, 127.0.0.1:5180)
-npm run dev:web      # 화면 개발 서버 (Vite, /api 는 5180 으로 프록시)
+npm run dev          # 개발: API(.env.dev, 5181, 저장 시 재시작) + 화면(Vite 5173, 저장 즉시 반영) 한 번에. 끌 때 Ctrl+C
 npm test             # 단위 테스트 (db·geo·scripts·api: node:test / web: vitest)
 ```
+
+**고친 코드를 운영에 반영하는 순서**
+
+1. 개발 DB에 먼저: `npm run migrate:dev` (새 마이그레이션이 있을 때) → <http://localhost:5173> 에서 확인 → `npm test`
+2. 운영 반영 — **운영 DB 마이그레이션 전에는 반드시 백업**:
+
+   ```bash
+   npm run backup && npm run migrate && npm run build
+   launchctl kickstart -k gui/$(id -u)/com.aptlog.api
+   npm run check
+   ```
+
+3. Git에 올리기: `git add -A && git commit -m "변경 내용" && git push`
+
+개발 DB를 운영 데이터로 다시 맞추고 싶으면 운영 백업 파일을 `RealtyLog_DEV` 로 복원한 뒤 `npm run db:setup:dev` 를 실행합니다.
 
 **실DB 통합 테스트**는 전용 DB `RealtyLog_TEST` 에서만 돕니다. 테스트가 `벽산 시험 1101-153012` 같은 이름의 단지를 매번 만들기 때문에 실사용 DB와 분리합니다.
 
@@ -312,9 +364,10 @@ npm run test:db
 
 | 명령 | 내용 |
 |---|---|
-| `npm run migrate` / `migrate:status` | 마이그레이션 적용 / 현황 |
-| `npm run check` | 설치 점검 (읽기 전용) |
-| `npm run db:setup` | DB·로그인 생성 (재실행 안전) |
+| `npm run dev` | 개발 서버 (API 5181 + 화면 5173, 실시간 반영) |
+| `npm run migrate` / `migrate:dev` / `migrate:status` | 마이그레이션 적용 (운영 / 개발) / 현황 |
+| `npm run check` / `check:dev` | 설치 점검 (읽기 전용) |
+| `npm run db:setup` / `db:setup:dev` | DB·로그인 생성, 복원 후 로그인·권한 정리 (재실행 안전) |
 | `npm run backup` | 백업 1회 |
 | `npm run trades:sync` | 실거래 동기화 (등록 단지 시군구 × 최근 3개월). `-- --sgg 11620 --months 12` 로 지정 |
 | `npm run kapt:import -- --file <CSV> [--apply]` | 단지 식별정보 적재 (아파트만, `--kinds 1,2,3` 으로 연립·다세대 포함) |
@@ -332,6 +385,21 @@ npm run test:db
 
 ---
 
+## Claude Code로 이어서 개발하기
+
+이 저장소는 Claude Code가 바로 이해하도록 구성돼 있습니다.
+
+1. 설치: `curl -fsSL https://claude.ai/install.sh | bash` (또는 Claude 데스크톱 앱의 Code 탭)
+2. 프로젝트 폴더에서 `claude` 실행 (데스크톱 앱이면 이 폴더를 열기)
+3. Claude Code가 자동으로 읽는 것
+   - [CLAUDE.md](CLAUDE.md) — 작업 규칙(스냅샷은 INSERT만, 마이그레이션은 새 파일만, 외부 API 쿼터 가드, 비밀값은 `.env` 만 등)과 맥미니 개발·운영 방법
+   - `.claude/launch.json` — 미리보기 서버 `aptlog-web-hmr`(화면 5173) + `aptlog-api-dev`(API 5181, `.env.dev`)
+4. 처음 시킬 말 예시: "docs/PROGRESS.md 와 APTLOG_DEV_PLAN.md §14 를 읽고 현재 상태를 요약해줘"
+
+`.env` 파일들은 저장소에 없으므로 새 PC에서는 이 README 4단계대로 직접 만듭니다.
+
+---
+
 ## 문제 해결
 
 먼저 `npm run check` 로 어느 단계가 빠졌는지 확인합니다.
@@ -343,7 +411,9 @@ npm run test:db
 | `호환성 수준 170` 관련 오류 | SQL Server 2025 이미지인지 (`docker-compose.yml` 의 `2025-latest`) |
 | 지도가 회색/인증 오류 | 네이버 콘솔 Web 서비스 URL, `NCP_KEY_ID`. 브라우저 주소가 `127.0.0.1:5180` 인지 |
 | `/geo/index.json 를 불러올 수 없습니다` | `web/public/geo` 가 있는지, `npm run build` 를 다시 했는지 |
-| 포트 5180 사용 중 | `lsof -i :5180` 으로 이미 떠 있는 서버(launchd 포함) 확인 |
+| 포트 5180 사용 중 | `lsof -i :5180` 으로 이미 떠 있는 서버(launchd 포함) 확인. 개발은 `.env.dev` 의 `PORT=5181` 인지 |
+| 단지에 실거래가 안 붙음 | 상세 › 개요 › 평형 표의 "실거래 면적" 에서 "맞추기" (등록 때 평→㎡ 추정값이 실제 면적과 다를 때) |
+| 화성시 등 개편 지역 실거래 0건 | `npm run migrate` 로 seed `030_region_code_map.sql`(새 구 코드 대응)이 들어갔는지 |
 | `sharp` 설치 오류 | `rm -rf node_modules && npm install` (Node 24 arm64 인지 `node -p process.arch`) |
 | 백업 실패 `Operating system error 5` | `~/AptLogBackup/db` 폴더가 있는지, `docker compose up -d` 를 그 뒤에 다시 했는지 |
 
