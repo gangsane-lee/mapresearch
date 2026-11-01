@@ -126,6 +126,12 @@ npm run migrate:status
 
 `migrate:status` 에서 모든 파일이 `적용` 이면 됩니다. 행정경계(`web/public/geo`)와 시군구 seed는 저장소에 들어 있어 따로 빌드할 필요가 없습니다.
 
+여기까지 왔으면 한 번 점검합니다 (아래 [설치 점검](#설치-점검-npm-run-check) 참고).
+
+```bash
+npm run check
+```
+
 ### 7. 단지 식별정보 적재 (단지 검색에 필요)
 
 [공공데이터포털](https://www.data.go.kr)에서 **"한국부동산원_공동주택 단지 식별정보_기본정보"** CSV를 내려받아 프로젝트 폴더에 둡니다(재배포 금지라 저장소에는 없습니다).
@@ -177,6 +183,38 @@ bash scripts/mac/install-launchd.sh
 - 해제: `bash scripts/mac/install-launchd.sh --uninstall`
 - 코드를 업데이트한 뒤에는 `npm install && npm run migrate && npm run build` 후 `launchctl kickstart -k gui/$(id -u)/com.aptlog.api` 로 서버를 다시 시작합니다.
 - 맥이 **잠자기** 중이면 깨어난 뒤 실행되지만, **전원이 꺼져** 있던 동안의 일정은 건너뜁니다. 시스템 설정 › 에너지 에서 "디스플레이가 꺼져 있을 때 자동으로 잠자기 방지"를 켜 두면 안정적입니다.
+
+### 설치 점검 (`npm run check`)
+
+설치가 제대로 됐는지 한 번에 확인하는 명령입니다. 아무것도 바꾸지 않고 읽기만 하며, 비밀번호·키 값은 출력하지 않습니다(설정 여부만). 각 단계 뒤에 언제든 실행해도 됩니다.
+
+```bash
+npm run check
+```
+
+```
+[3. SQL Server]
+✓ 컨테이너 aptlog-mssql — running
+✓ 앱 로그인 aptlog_prod_app → RealtyLog_PROD
+✓ SQL Server 버전 17 (Express Edition (64-bit)) — 2025
+✓ DB 시각이 이 PC 시각(KST)과 같음 — 0분 차이
+[4. 스키마·기본 데이터]
+✗ 마이그레이션 0/5 적용
+    → npm run migrate
+...
+결과: 통과 21 · 경고 2 · 실패 1
+```
+
+`✗` 줄 아래 `→` 안내대로 고친 뒤 다시 실행해 실패가 0이 되면 설치가 끝난 것입니다. `!` 경고는 동작은 하지만 확인이 필요한 항목입니다(예: 단지 식별정보 미적재, 서버 미기동, 백업이 같은 디스크).
+
+| 구역 | 확인하는 것 |
+|---|---|
+| 1. 도구 | Node 24·arm64, `npm install` 여부 |
+| 2. .env | 필수 값, 키 설정 여부, 사진·백업 폴더 쓰기 권한 |
+| 3. SQL Server | Docker 컨테이너 실행, 앱 로그인, 2025 버전, 호환성 170, 한글 정렬, 한국 시각 |
+| 4. 스키마·기본 데이터 | 마이그레이션 적용 수, 시군구·항목 정의·쿼터 seed, 단지 식별정보 건수, 스냅샷 수정·삭제 차단 권한 |
+| 5. 화면·서버 | 행정경계 파일, 화면 빌드가 최신인지, 서버 응답 |
+| 6. 자동 실행·백업 | launchd 3개 등록, 마지막 백업 성공·경과 시간 |
 
 ### 11. 백업 확인과 복원 연습
 
@@ -275,6 +313,7 @@ npm run test:db
 | 명령 | 내용 |
 |---|---|
 | `npm run migrate` / `migrate:status` | 마이그레이션 적용 / 현황 |
+| `npm run check` | 설치 점검 (읽기 전용) |
 | `npm run db:setup` | DB·로그인 생성 (재실행 안전) |
 | `npm run backup` | 백업 1회 |
 | `npm run trades:sync` | 실거래 동기화 (등록 단지 시군구 × 최근 3개월). `-- --sgg 11620 --months 12` 로 지정 |
@@ -294,6 +333,8 @@ npm run test:db
 ---
 
 ## 문제 해결
+
+먼저 `npm run check` 로 어느 단계가 빠졌는지 확인합니다.
 
 | 증상 | 확인할 것 |
 |---|---|

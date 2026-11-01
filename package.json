@@ -13,6 +13,7 @@
     "migrate": "node db/run-migrations.js",
     "migrate:status": "node db/run-migrations.js --status",
     "db:setup": "node scripts/setup-db.js",
+    "check": "node scripts/check-setup.js",
     "geo:build": "node geo/build-boundaries.js",
     "dev:api": "npm run dev -w api",
     "start": "npm start -w api",
