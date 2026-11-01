@@ -256,7 +256,8 @@ onBeforeUnmount(() => adapter.value?.destroy());
 .logo { font-size: 18px; }
 .spacer { flex: 1; }
 .map-wrap { grid-area: map; position: relative; min-height: 0; }
-.map { position: absolute; inset: 0; }
+/* 네이버 SDK가 인라인 position: relative 를 넣으므로 inset 대신 크기를 직접 지정 */
+.map { position: absolute; inset: 0; width: 100%; height: 100%; }
 .status-line {
   position: absolute; left: 12px; bottom: 12px; display: flex; gap: 12px; flex-wrap: wrap;
   background: rgb(255 255 255 / 0.92); padding: 6px 10px; border-radius: var(--radius); font-size: 13px;
