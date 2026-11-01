@@ -69,6 +69,8 @@ npm run test:db
 
 ## 그 밖의 스크립트
 
+- 단지 식별정보 CSV 적재 (한국부동산원 "공동주택 단지 식별정보_기본정보", 분기 1회 정도): `npm run kapt:import -- --file <CSV>` → 확인 후 `--apply` (아파트만, `--kinds 1,2,3` 으로 연립·다세대 포함)
+- 실거래 동기화: `npm run trades:sync` (등록 단지 시군구 × 최근 3개월) / `-- --sgg 11620 --months 12`. 매주 자동: `scriptsegister-trade-task.ps1`
 - 정비사업 CSV 적재 (연 1회): `node scripts/import-redev.js --file <CSV> --year 2026` → 매핑 확인 후 `--apply`
 - 공공 API 응답 확인 (키 발급 후): `node scripts/probe-api.js --lawd 11620 --ym 202608`
 - Windows 서비스 등록 (WinSW): `scripts\install-service.ps1` (관리자)

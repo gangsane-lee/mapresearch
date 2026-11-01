@@ -48,6 +48,8 @@ test('SPA fallback: 알 수 없는 경로는 index.html', async () => {
     const r = await fetch(`${base}/complex/12/detail`);
     assert.equal(r.status, 200);
     assert.match(await r.text(), /AptLog/);
+    const geo = await fetch(`${base}/geo/index.json`);
+    assert.equal(geo.status, 404, '없는 정적 파일은 index.html 이 아니라 404');
   });
 });
 

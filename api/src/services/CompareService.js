@@ -21,9 +21,10 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
   const asOfYmd = asOf ?? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
   const meta = await loadMeta(pool);
-  const settings = await getSettings(pool, ['budget_man', 'stale_days', 'weight.traffic', 'weight.env', 'weight.edu', 'weight.price']);
+  const settings = await getSettings(pool, ['budget_man', 'stale_days', 'weight.traffic', 'weight.env', 'weight.edu', 'weight.price', 'area_match_tolerance_m2']);
+  const tol = Number(settings.area_match_tolerance_m2 ?? 0.5);
 
-  const r = pool.request().input('asOf', sql.Date, asOfYmd);
+  const r = pool.request().input('asOf', sql.Date, asOfYmd).input('tol', sql.Decimal(5, 2), tol);
   const idList = ids.map((id, i) => (r.input(`c${i}`, sql.Int, id), `@c${i}`)).join(',');
   // 평형 지정: (complex, area) 쌍을 VALUES 로 넘김
   const areaPairs = ids
@@ -33,14 +34,15 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
     ? `(SELECT x.cid, x.aid FROM (VALUES ${areaPairs.join(',')}) AS x(cid, aid))`
     : '(SELECT CAST(NULL AS int) AS cid, CAST(NULL AS int) AS aid WHERE 1 = 0)';
 
-  const base = await r.query(`
-    WITH pick AS (
+  const pickCte = `WITH pick AS (
       SELECT c.complex_id,
              COALESCE((SELECT a2.area_type_id FROM dbo.area_type a2 JOIN ${areaSrc} s ON s.aid = a2.area_type_id
                        WHERE s.cid = c.complex_id AND a2.complex_id = c.complex_id),
                       (SELECT a3.area_type_id FROM dbo.area_type a3 WHERE a3.complex_id = c.complex_id AND a3.is_primary = 1)) AS area_type_id
       FROM dbo.complex c WHERE c.complex_id IN (${idList})
-    )
+    )`;
+  const base = await r.query(`
+    ${pickCte}
     SELECT p.complex_id, p.area_type_id, f.field_cd,
            x.num_val, x.text_val, x.date_val, x.eff_observed_at, x.is_carried, x.observed_at
     FROM pick p
@@ -85,9 +87,18 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
       AND x.snapshot_id = (SELECT TOP (1) y.snapshot_id FROM dbo.v_snapshot_diff y
                            WHERE y.complex_id = x.complex_id AND y.field_cd = 'price_ask'
                              AND y.area_type_id = x.area_type_id AND y.observed_at <= @asOf
-                           ORDER BY y.observed_at DESC, y.snapshot_id DESC);`);
+                           ORDER BY y.observed_at DESC, y.snapshot_id DESC);
 
-  const [valueRows, headRows, commuteRows, anchorRows, seriesRows, deltaRows] = base.recordsets;
+    -- 수집된 실거래 중 기준일 이전 최신 정상 거래 (선택 평형 ±오차). 스냅샷에 기록한 실거래가 없을 때 쓰는 값
+    ${pickCte}
+    SELECT p.complex_id, t.deal_date, t.amount_man, t.floor
+    FROM pick p
+    JOIN dbo.area_type a ON a.area_type_id = p.area_type_id
+    CROSS APPLY (SELECT TOP (1) t.deal_date, t.amount_man, t.floor FROM dbo.trade t
+                 WHERE t.complex_id = p.complex_id AND t.cancel_flag = 0 AND t.deal_date <= @asOf AND ABS(t.excl_m2 - a.excl_m2) <= @tol
+                 ORDER BY t.deal_date DESC, t.trade_id DESC) t;`);
+
+  const [valueRows, headRows, commuteRows, anchorRows, seriesRows, deltaRows, tradeRows] = base.recordsets;
   const budget = settings.budget_man == null || settings.budget_man === '' ? null : Number(settings.budget_man);
   const anchors = anchorRows.map((a) => ({ anchorId: a.anchor_id, name: a.name, kind: a.kind, lat: num(a.lat), lng: num(a.lng) }));
 
@@ -105,7 +116,10 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
         values[v.field_cd] = { value: fromColumns(def, v), observedAt: ymd(v.eff_observed_at), carried: !!v.is_carried };
       }
       const ask = values.price_ask?.value ?? null;
-      const lastTrade = values.price_last_trade?.value ?? null;
+      const tr = tradeRows.find((x) => x.complex_id === id);
+      const trade = tr ? { dealDate: ymd(tr.deal_date), amountMan: tr.amount_man, floor: tr.floor } : null;
+      // 괴리율 기준: 스냅샷에 기록한 실거래(내가 확인한 값) 우선, 없으면 수집된 실거래
+      const lastTrade = values.price_last_trade?.value ?? trade?.amountMan ?? null;
       const delta = deltaRows.find((x) => x.complex_id === id && x.area_type_id === areaTypeId);
       const pos = h.lat != null ? { lat: Number(h.lat), lng: Number(h.lng) } : null;
       return {
@@ -130,8 +144,10 @@ export async function compare(pool, ids, { asOf, areas = new Map() } = {}) {
           .map((x) => ({ areaTypeId: x.area_type_id, label: x.area_label, exclM2: num(x.excl_m2), rooms: x.rooms, baths: x.baths })),
         areaTypeId,
         values,
+        trade,
         derived: {
           gapPct: ask != null && lastTrade ? Math.round(((ask - lastTrade) / lastTrade) * 1000) / 10 : null,
+          gapBase: ask == null || !lastTrade ? null : values.price_last_trade?.value != null ? 'SNAPSHOT' : 'TRADE',
           budgetDiff: ask != null && budget != null ? ask - budget : null,
           askDelta: delta ? num(delta.delta) : null,
           askDeltaPrevAt: delta ? ymd(delta.prev_at) : null,

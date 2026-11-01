@@ -2,7 +2,7 @@
 //   반영: 기존 CURRENT → SUPERSEDED, PENDING → CURRENT
 //   무시: PENDING → REJECTED (같은 hash는 다시 묻지 않음 — 재검증 배치가 REJECTED hash를 건너뛴다)
 import { sql } from '../db/pool.js';
-import { withTransaction } from '../db/tx.js';
+import { withTransaction, ymd } from '../db/tx.js';
 import { AppError } from '../util/errors.js';
 
 async function requirePending(req, revId) {
@@ -58,7 +58,7 @@ export async function revisionDiff(pool, complexId) {
     plat_area: '대지면적',
     park_cnt: '주차대수',
   };
-  const norm = (v) => (v == null ? null : v instanceof Date ? v.toISOString().slice(0, 10) : String(Number.isNaN(Number(v)) ? v : Number(v)));
+  const norm = (v) => (v == null ? null : v instanceof Date ? ymd(v) : String(Number.isNaN(Number(v)) ? v : Number(v)));
   const changes = Object.entries(LABELS)
     .filter(([k]) => norm(cur?.[k]) !== norm(pen[k]))
     .map(([k, label]) => ({ field: k, label, current: norm(cur?.[k]), pending: norm(pen[k]) }));

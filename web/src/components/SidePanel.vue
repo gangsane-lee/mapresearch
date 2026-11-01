@@ -48,6 +48,16 @@ const complexStore = useComplexesStore();
 const flagsOf = (id) => complexStore.byId.get(id)?.flags ?? []; // A3 가격 알림 (요약 목록 기준)
 const v = (item, cd) => item.values[cd]?.value ?? null;
 const obs = (item, cd) => item.values[cd]?.observedAt ?? null;
+/** 최근 실거래: 스냅샷에 기록한 값 우선, 없으면 수집된 실거래(trade 테이블) */
+function lastTrade(item) {
+  if (v(item, 'price_last_trade') != null) {
+    return { value: v(item, 'price_last_trade'), ym: v(item, 'price_last_trade_ym'), observedAt: obs(item, 'price_last_trade'), collected: false };
+  }
+  if (item.trade) return { value: item.trade.amountMan, ym: item.trade.dealDate, observedAt: null, collected: true };
+  return null;
+}
+const tradeText = (t, short) =>
+  t == null ? '-' : `${formatMan(t.value)}${t.ym ? ` (${short ? String(t.ym).slice(2, 7).replace('-', '.') : String(t.ym).slice(0, 10)})` : ''}`;
 const areaOf = (item) => item.areaTypes.find((a) => a.areaTypeId === item.areaTypeId);
 const signCls = (n) => (n > 0 ? 'up' : n < 0 ? 'down' : '');
 const pct = (n) => (n == null ? '-' : `${n > 0 ? '+' : ''}${n}%`);
@@ -130,8 +140,8 @@ const rows = computed(() => {
 
   sec('가격');
   numRow('price_ask', formatMan);
-  row('최근 실거래', (i) => (v(i, 'price_last_trade') == null ? '-' : `${formatMan(v(i, 'price_last_trade'))}${v(i, 'price_last_trade_ym') ? ` (${String(v(i, 'price_last_trade_ym')).slice(2, 7).replace('-', '.')})` : ''}`), {
-    obs: (i) => obs(i, 'price_last_trade'),
+  row('최근 실거래', (i) => tradeText(lastTrade(i), true), {
+    obs: (i) => lastTrade(i)?.observedAt ?? null,
   });
   row('호가 괴리율', (i) => pct(i.derived.gapPct), { rank: (i) => i.derived.gapPct, better: 'DOWN', cls: (i) => signCls(i.derived.gapPct) });
   if (data.value.budgetMan != null) {
@@ -200,7 +210,10 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
         </svg>
         <dl>
           <dt>최근 실거래</dt>
-          <dd>{{ formatMan(v(one, 'price_last_trade')) }} <small class="muted">{{ v(one, 'price_last_trade_ym') ? String(v(one, 'price_last_trade_ym')).slice(0, 7) : '' }}</small></dd>
+          <dd>
+            {{ formatMan(lastTrade(one)?.value) }}
+            <small class="muted">{{ lastTrade(one)?.ym ? String(lastTrade(one).ym).slice(0, lastTrade(one).collected ? 10 : 7) : '' }}{{ lastTrade(one)?.collected ? ' · 수집' : '' }}</small>
+          </dd>
           <dt>괴리율</dt>
           <dd :class="signCls(one.derived.gapPct)">{{ pct(one.derived.gapPct) }}</dd>
           <template v-if="data.budgetMan != null">

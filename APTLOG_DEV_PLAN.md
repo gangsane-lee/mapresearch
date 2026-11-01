@@ -581,9 +581,9 @@ FROM v;
 
 | # | 항목 | 검증 방법 |
 |---|---|---|
-| U1 | K-apt 단지 목록 API 오퍼레이션명·버전 | 활용신청 후 Swagger |
+| ~~U1~~ | ~~K-apt 단지 목록 API 오퍼레이션명·버전~~ → **대체(2026-11-01)**: 목록 API 미신청(`AptListService3` 호출 시 "서비스 없음"). 한국부동산원 "공동주택 단지 식별정보_기본정보" CSV(2026-08-31, 30.8만 행, EUC-KR)를 `kapt_ref`로 적재해 등록 검색·마스터 출처로 사용(`scripts/import-kapt.js`) | 실제 파일 헤더 확인 |
 | U2 | K-apt 기본정보 V4 응답 필드명(구버전 `kaptUsedate`, `codeHallNm` 등과 동일 여부) | 실제 호출 응답 확인 |
-| U3 | 전월세 실거래 API 엔드포인트·필드명 | 활용신청 후 확인 |
+| ~~U3~~ | ~~전월세 실거래 API 엔드포인트·필드명~~ → **해결(2026-11-01)**: 매매 `RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade`, 전월세 `RTMSDataSvcAptRent/getRTMSDataSvcAptRent`(XML). 필드는 `docs/api-samples/rtms_*.xml`로 고정(`api/src/external/rtms.js` zod). **매매 응답에 `aptSeq` 없음** → 단지 연결은 법정동코드+지번, 한 필지 다단지(전국 필지의 약 15%)는 거래 단지명(`aptNm`)이 식별정보 공시가격 단지명과 같을 때만 연결 | 2026-09 관악구 실제 호출 |
 | U4 | 재건축 준공 후 kaptCode 교체 여부 | 사례 단지 조회 |
 | U5 | aptSeq ↔ kaptCode 공식 매핑 부재 (지번 매칭 + 수동 확정으로 설계) | — |
 | U6 | 네이버 지도 이동·확대 시 과금 건수 산정 방식 (어느 쪽이든 무료 범위) | 콘솔 이용량 모니터링 |
@@ -597,7 +597,10 @@ FROM v;
 | U14 | 가계 시스템(`HH_*`) 쪽 예산 계약 뷰 이름·컬럼 | 가계 시스템 스키마 확인 후 합의 |
 | U15 | 행정구역 개편 지역(인천 2026-07, 화성 2026-02)의 실거래·K-apt API가 쓰는 시군구 코드(신·구 코드 적용 시점) | 해당 지역 개편 전후 월 실제 조회 |
 | U16 | 실거래 `excl_m2` 평형 매칭 허용 오차 ±0.5㎡의 적정성 | 추적 단지 실거래로 검증 후 `setting` 조정 |
-| U17 | 같은 응답 내 동일 키 정상 거래(`dup_seq`)가 재수집 시 순서·건수가 안정적인지 | 같은 월 반복 조회 비교 |
+| U17 | 같은 응답 내 동일 키 정상 거래(`dup_seq`)가 재수집 시 순서·건수가 안정적인지. 2026-11-01 관찰: 같은 날 재조회는 추가 0·갱신 전부(안정), `dup_seq`=2 는 대부분 "해제된 원거래 + 같은 조건 재신고" 쌍 | 같은 월 반복 조회 비교 (시간 간격 두고 재확인) |
+| U18 | 매매 `cdealDay`(해제사유발생일) 원문 형식 — 현재 'yy.MM.dd'·'yyyyMMdd'·'yyyy-MM-dd' 해석, 모르는 형식이면 해제일 NULL(해제 여부는 `cdealType` 값 유무로 판정) | 해제 건 원문 저장해 확인 |
+| U19 | 단지 식별정보 `단지종류` 코드표 (1 아파트 / 2 연립 / 3 다세대로 판단 — 데이터의 단지명으로 추정, 공식 코드표 미확인) | 한국부동산원 파일 설명서 |
+| U20 | 공공데이터포털 쿼터는 **인증키 단위**인데 `api_quota`는 DB(DEV/TEST/PROD)별로 센다 → 여러 DB에서 같은 키로 배치를 돌리면 합산 초과 가능 | 운영은 PROD 한 곳에서만 배치 |
 
 ---
 
@@ -628,4 +631,5 @@ FROM v;
 | 2026-10-31 | 최초 작성 |
 | 2026-11-01 | 개발 전 검토 반영: 실행 환경 실측 추가(§2.1.1), Node 24 LTS로 변경, SQLEXPRESS 고정 포트·전용 로그인·`useUTC:false`, DB DEV/PROD 분리 및 가계 연동 시노님(§4.4), `is_void` 제거 → `snapshot_void` INSERT 방식, carry_forward 값 구분·실효 관측일, 과거 일자 스냅샷의 실거래 기준일, 실거래 자연키·`dup_seq` upsert, 평형 매칭 오차, `region_code_map`, `listing` 스키마 선반영(A8), 서버 쿼터 가드(§5.2.1), 실거래 페이징, mapshaper·시 단위 경계 사전 생성, 클러스터링 보류, WinSW, LAN 노출 시 토큰 인증·업로드 제한, 백업 디스크 분리·서비스 계정 권한·보관 정리 예외, P0에 환경 준비·API 신청 추가, MVP=P0~P2, U12 해결 및 U14~U17 추가 |
 | 2026-11-01 | 구현 중 확정: 1433 포트는 이미 127.0.0.1/::1 고정 리슨(변경 불필요), 로그인 명명 `aptlog_{env}_{app,mig}`(가계 시스템 규칙), `commute`도 append-only, `field_def.confirm_on_carry` 추가, 수동 단지 등록 API(§5.4 9번) 선구현, `/api/compare`·`/api/backup/status`·`/api/media` 구현, A2 가중치(`setting weight.*`) 구현. 진행 현황은 docs/PROGRESS.md |
+| 2026-11-01 | 실제 API·파일 반영: 매매·전월세 실거래 엔드포인트 확정(U3 해결), K-apt 목록 API 대신 단지 식별정보 CSV(`kapt_ref`, U1 대체), 마이그레이션 004(`kapt_ref`, `trade.apt_seq` NULL 허용, `trade/trade_rent.bjd_cd·umd_nm`, `complex.jibun`), 실거래 동기화 `scripts/sync-trades.js`·`POST /api/sync/trades`, 단지 연결 규칙(필지+단지명), U18~U20 추가 |
 | 2026-11-01 | 사용자 결정 반영: DB DEV/PROD 분리 확정, 복사값은 복사하되 호가·등급은 저장 전 확인 확정, **A8 매물 단위 스키마 선반영 취소**(평형 단위 호가만, 도입 시 마이그레이션 방법 §10 A8에 기록), **백업은 당분간 같은 디스크 별도 폴더**(경고 표시, 추후 이전) |

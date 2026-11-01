@@ -87,6 +87,13 @@ input { font: inherit; }
   place-items: center;
   background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 12px, #e2e8f0 12px, #e2e8f0 24px);
 }
+.map-unavailable .marker-list {
+  position: absolute; top: 12px; left: 12px; right: 12px; z-index: 1;
+  display: flex; flex-wrap: wrap; gap: 8px; max-height: calc(100% - 120px); overflow: auto;
+}
+.map-unavailable .marker-item { border: 0; background: none; padding: 0; cursor: pointer; font: inherit; }
+.map-unavailable .marker-item.dimmed { opacity: 0.4; }
+.map-unavailable .marker-item.selected > * { outline: 3px solid var(--accent, #2563eb); outline-offset: 1px; }
 .map-unavailable::after {
   content: '지도를 표시할 수 없습니다 — ' attr(data-reason);
   background: #fff;

@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AppError } from './util/errors.js';
+import { localDateTime } from './db/tx.js';
 import { requireToken } from './middleware/auth.js';
 import { healthRouter } from './routes/health.js';
 import { quotaRouter } from './routes/quota.js';
@@ -14,6 +15,7 @@ import { compareRouter } from './routes/compare.js';
 import { masterRevisionsRouter, comparisonsRouter, settingsRouter, anchorsRouter, schoolsRouter, visitsRouter, redevRouter } from './routes/misc.js';
 import { backupRouter } from './routes/backup.js';
 import { mediaApiRouter, mediaFileRouter } from './routes/media.js';
+import { kaptRouter, syncRouter } from './routes/kapt.js';
 
 const defaultWebDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
@@ -26,6 +28,11 @@ const defaultWebDist = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 export function createApp({ config, getPool, webDist = defaultWebDist }) {
   const app = express();
   app.disable('x-powered-by');
+  // 응답의 Date 는 UTC(…Z)가 아니라 KST 로컬 시각 문자열로 (CLAUDE.md: 일시는 KST 로컬)
+  app.set('json replacer', function (key, value) {
+    const raw = this[key];
+    return raw instanceof Date && !Number.isNaN(raw.getTime()) ? localDateTime(raw) : value;
+  });
   app.use(express.json({ limit: '1mb' }));
 
   if (config.apiToken) {
@@ -48,6 +55,8 @@ export function createApp({ config, getPool, webDist = defaultWebDist }) {
   app.use('/api/schools', schoolsRouter({ getPool }));
   app.use('/api/visits', visitsRouter({ getPool }));
   app.use('/api/redev-refs', redevRouter({ getPool }));
+  app.use('/api/kapt', kaptRouter({ getPool }));
+  app.use('/api/sync', syncRouter({ getPool, config }));
   app.use('/api/media', mediaApiRouter({ getPool, config }));
   app.use('/media', mediaFileRouter({ getPool, config }));
 
@@ -56,7 +65,11 @@ export function createApp({ config, getPool, webDist = defaultWebDist }) {
   if (existsSync(webDist)) {
     app.use(express.static(webDist));
     // Express 5 (path-to-regexp v8) 와일드카드 문법
-    app.get('/{*splat}', (_req, res) => res.sendFile(path.join(webDist, 'index.html')));
+    // 확장자가 있는 요청(없는 /geo/*.json 등)은 index.html 대신 404 — 화면이 HTML을 JSON으로 파싱하지 않도록
+    app.get('/{*splat}', (req, res) => {
+      if (path.extname(req.path)) return res.status(404).type('text/plain').send('Not Found');
+      res.sendFile(path.join(webDist, 'index.html'));
+    });
   }
 
   app.use((err, _req, res, _next) => {

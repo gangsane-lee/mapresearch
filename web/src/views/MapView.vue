@@ -92,10 +92,11 @@ function renderMarkers() {
   if (!a) return;
   a.clearMarkers();
   for (const c of complexes.visible) {
-    if (c.lat == null || c.lng == null) continue;
+    const noPin = c.lat == null || c.lng == null;
+    if (noPin && !(a instanceof NullMapAdapter)) continue; // 지도에는 핀 있는 단지만, 대체 목록에는 전부
     a.addMarker({
       id: c.complexId,
-      position: { lat: c.lat, lng: c.lng },
+      position: noPin ? null : { lat: c.lat, lng: c.lng },
       html: markerHtml(c),
       dimmed: inRegion.value ? !inRegion.value.has(c.complexId) : false,
     });

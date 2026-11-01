@@ -3,6 +3,7 @@ import { listSummary } from '../services/ComplexService.js';
 import { createManual, patchComplex, getComplex } from '../services/ComplexWriteService.js';
 import { listSnapshots, getDraft, createSnapshot, getSeries, getCommuteSeries } from '../services/SnapshotService.js';
 import { listTrades } from '../services/TradeService.js';
+import { linkTrades } from '../services/TradeSyncService.js';
 import { revisionDiff } from '../services/MasterService.js';
 import { complexSchools, assignSchool } from '../services/SchoolService.js';
 import { idParam } from './params.js';
@@ -16,7 +17,11 @@ export function complexesRouter({ getPool }) {
   });
 
   r.post('/manual', async (req, res) => {
-    res.status(201).json(await createManual(await getPool(), req.body));
+    const pool = await getPool();
+    const out = await createManual(pool, req.body);
+    // 이미 수집된 실거래를 바로 연결 (로컬 DB만 — 외부 호출 없음)
+    if (req.body?.jibun && req.body?.bjdCd) out.linked = await linkTrades(pool, req.body.sigunguCd);
+    res.status(201).json(out);
   });
 
   r.get('/:id', async (req, res) => {

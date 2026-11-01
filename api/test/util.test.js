@@ -67,3 +67,10 @@ test('computeFlags: 괴리 −5% 이하, 실거래 하락', async () => {
   assert.deepEqual(computeFlags({ priceAsk: null, lastTrade: t(113000), prevTrade: null }), []);
   assert.deepEqual(computeFlags({ priceAsk: 108000, lastTrade: t(113000), prevTrade: null }, -3).map((f) => f.pct), [-4.4]);
 });
+
+test('localDateTime / ymd: 로컬 기준 (UTC로 바꾸지 않음)', async () => {
+  const { localDateTime, ymd } = await import('../src/db/tx.js');
+  const d = new Date(2026, 10, 1, 7, 40, 5); // 로컬 2026-11-01 07:40:05
+  assert.equal(localDateTime(d), '2026-11-01T07:40:05');
+  assert.equal(ymd(new Date(2026, 10, 1)), '2026-11-01');
+});

@@ -18,7 +18,9 @@
     "test": "node --test \"db/test/*.test.js\" \"geo/test/*.test.js\" && npm test -w api && npm test -w web",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web",
-    "test:db": "node --env-file=.env.test --test \"api/test-db/*.test.js\""
+    "test:db": "node --env-file=.env.test --test \"api/test-db/*.test.js\"",
+    "kapt:import": "node scripts/import-kapt.js",
+    "trades:sync": "node scripts/sync-trades.js"
   },
   "dependencies": {
     "mssql": "12.7.13"

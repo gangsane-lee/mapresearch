@@ -35,11 +35,11 @@ const base = 'https://apis.data.go.kr/1613000';
 const probes = [
   {
     name: 'rtms_trade',
-    url: `${base}/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev`,
+    url: `${base}/RTMSDataSvcAptTrade/getRTMSDataSvcAptTrade`,
     params: { LAWD_CD: a.lawd, DEAL_YMD: a.ym, pageNo: 1, numOfRows: 10 },
   },
   {
-    name: 'rtms_rent (후보 U3)',
+    name: 'rtms_rent',
     url: `${base}/RTMSDataSvcAptRent/getRTMSDataSvcAptRent`,
     params: { LAWD_CD: a.lawd, DEAL_YMD: a.ym, pageNo: 1, numOfRows: 10 },
   },

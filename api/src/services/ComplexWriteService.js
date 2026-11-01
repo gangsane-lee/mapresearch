@@ -40,13 +40,15 @@ export const manualInput = z.object({
   bjdCd: z.string().regex(/^\d{10}$/).nullish(),
   jibunAddr: z.string().max(200).nullish(),
   roadAddr: z.string().max(200).nullish(),
-  lat,
-  lng,
+  jibun: z.string().regex(/^(산)?\d{1,4}(-\d{1,4})?$/).nullish(), // 실거래 연결 키 (법정동코드와 함께)
+  kaptDanjiId: z.string().regex(/^\d{14}$/).nullish(), // kapt_ref 단지고유번호 (단지 식별정보 검색으로 등록한 경우)
+  lat: lat.nullish(), // 지도 키가 없으면 핀 없이 등록하고 나중에 지정
+  lng: lng.nullish(),
   status: z.enum(STATUS).default('INTEREST'),
   tags: z.array(z.string().min(1).max(30)).max(20).default([]),
   areaTypes: z.array(areaInput).min(1).max(20),
   master: masterInput.default({}),
-});
+}).refine((v) => (v.lat == null) === (v.lng == null), '핀 좌표는 lat/lng를 함께 보내야 합니다');
 
 export const patchInput = z
   .object({
@@ -89,6 +91,14 @@ export async function createManual(pool, body) {
   return withTransaction(pool, async (_tx, req) => {
     const region = await req().input('g', sql.Char(5), v.sigunguCd).query('SELECT 1 AS ok FROM dbo.region WHERE sigungu_cd = @g');
     if (!region.recordset.length) throw new AppError('VALIDATION', `등록되지 않은 시군구 코드: ${v.sigunguCd} (geo:build 후 migrate)`, 400);
+    if (v.kaptDanjiId) {
+      const k = await req().input('k', sql.Char(14), v.kaptDanjiId).query('SELECT 1 AS ok FROM dbo.kapt_ref WHERE danji_id = @k');
+      if (!k.recordset.length) throw new AppError('VALIDATION', `단지 식별정보에 없는 단지고유번호: ${v.kaptDanjiId}`, 400);
+      const dup = await req()
+        .input('k', sql.VarChar(50), v.kaptDanjiId)
+        .query("SELECT complex_id FROM dbo.complex_ext_id WHERE source = 'KAPT' AND ext_id = @k AND valid_to IS NULL");
+      if (dup.recordset.length) throw new AppError('CONFLICT', `이미 등록된 단지입니다 (#${dup.recordset[0].complex_id})`, 409);
+    }
 
     const c = await req()
       .input('n', sql.NVarChar(100), v.displayNm)
@@ -96,12 +106,19 @@ export async function createManual(pool, body) {
       .input('b', sql.Char(10), v.bjdCd ?? null)
       .input('j', sql.NVarChar(200), v.jibunAddr ?? null)
       .input('r', sql.NVarChar(200), v.roadAddr ?? null)
-      .input('la', sql.Decimal(9, 6), v.lat)
-      .input('ln', sql.Decimal(9, 6), v.lng)
+      .input('jb', sql.NVarChar(30), v.jibun ?? null)
+      .input('la', sql.Decimal(9, 6), v.lat ?? null)
+      .input('ln', sql.Decimal(9, 6), v.lng ?? null)
       .input('st', sql.VarChar(20), v.status).query(`
-        INSERT dbo.complex (display_nm, sigungu_cd, bjd_cd, jibun_addr, road_addr, lat, lng, status)
-        OUTPUT inserted.complex_id VALUES (@n, @g, @b, @j, @r, @la, @ln, @st)`);
+        INSERT dbo.complex (display_nm, sigungu_cd, bjd_cd, jibun_addr, road_addr, jibun, lat, lng, status)
+        OUTPUT inserted.complex_id VALUES (@n, @g, @b, @j, @r, @jb, @la, @ln, @st)`);
     const complexId = c.recordset[0].complex_id;
+    if (v.kaptDanjiId) {
+      await req()
+        .input('c', sql.Int, complexId)
+        .input('k', sql.VarChar(50), v.kaptDanjiId)
+        .query("INSERT dbo.complex_ext_id (complex_id, source, ext_id, valid_from) VALUES (@c, 'KAPT', @k, CAST(SYSDATETIME() AS date))");
+    }
 
     let sort = 0;
     for (const a of v.areaTypes) {
@@ -133,7 +150,7 @@ export async function createManual(pool, body) {
       .input('br', sql.Decimal(7, 2), m.bcRatio ?? null)
       .input('pa', sql.Decimal(14, 2), m.platArea ?? null)
       .input('pk', sql.Int, m.parkCnt ?? null)
-      .input('raw', sql.NVarChar(sql.MAX), JSON.stringify({ source: 'MANUAL', master: m }))
+      .input('raw', sql.NVarChar(sql.MAX), JSON.stringify({ source: v.kaptDanjiId ? 'KAPT_CSV' : 'MANUAL', kaptDanjiId: v.kaptDanjiId ?? null, master: m }))
       .input('hash', sql.Char(64), masterHash(m)).query(`
         INSERT dbo.master_revision (complex_id, status, use_apr_day, hhld_cnt, dong_cnt, max_floor, builder, heat_type, hall_type,
                                     far_ratio, bc_ratio, plat_area, park_cnt, raw_json, payload_hash, fetched_at, decided_at)

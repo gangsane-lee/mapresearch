@@ -31,7 +31,9 @@
 | `/api/public-config`, `/api/complexes/summary` | 완료 (SQL tempdb 검증) |
 | 외부 API 공통부 `external/http.js` (쿼터→타임아웃→재시도→sync_log) | 완료 (테스트) |
 | `scripts/probe-api.js` — 키 발급 후 실제 응답 저장 | 완료. **사용자 실행 필요** |
-| 공공 API 연동 단지 등록(K-apt·건축HUB·실거래), 실거래 배치 | **대기**: U1~U3 확인 필요 (CLAUDE.md: 추측 구현 금지) |
+| 단지 식별정보 CSV 검색 등록(`kapt_ref`, `/api/kapt/search`, `/api/kapt/:id/draft` 평형 후보) | 완료 (실DB·화면 확인) |
+| 실거래 매매·전월세 수집(`external/rtms.js`), 적재·해제 갱신·단지 연결(`TradeSyncService`) | 완료 (실제 API로 관악구 2026-09~10 적재, 실DB 테스트) |
+| 건축HUB 마스터(복도유형·용적률 등) | 대기 (활용신청·응답 확인 필요) |
 | 수동 단지 등록 (`POST /api/complexes/manual`, 화면) | 완료 — API 키 없이도 사용 가능 |
 | GL 모드 스파이크(U7) | 대기 (키 필요) |
 
@@ -75,7 +77,8 @@
 |---|---|
 | 사진 업로드 (multer 메모리, MIME 화이트리스트, sharp 디코딩 검증, 480px webp 썸네일, EXIF 촬영일·GPS, sha256 중복 차단, 경로 조작 차단) | 완료 (단위 + 가짜 DB 경로 테스트) |
 | 사진 탭 (스냅샷별 그룹, 다중 업로드, Ctrl+V 캡처, 같은 날 스냅샷 연결 제안, 원본 보기, 토큰 모드 blob URL) | 완료 (빌드). 실제 화면 확인은 DB 준비 후 |
-| 월 실거래 배치, 마스터 재검증, 후속 단지 연결, 괴리 플래그(A3), 월 리포트(A4) | **대기**: 외부 API 응답 확인(U1~U3) 필요 |
+| 실거래 배치 `scripts/sync-trades.js` + `scripts/register-trade-task.ps1`(매주) | 완료. 작업 스케줄러 등록은 사용자 |
+| 마스터 재검증, 월 리포트(A4) | 대기 |
 
 ## P4·P5 추가 (DB·키 불필요분)
 
@@ -86,12 +89,30 @@
 | 정비사업 CSV: `scripts/import-redev.js` (UTF-8/EUC-KR 자동, 헤더 키워드 매핑 미리보기 → `--apply`, 같은 연도 재적재 거부), `/api/redev-refs` 단지 수동 연결, 정비 타임라인 탭 패널 | 완료 (합성 CSV로 미리보기 확인). 실제 CSV 헤더는 다운로드 후 확인 |
 | A9 휴대폰 화면: 375px에서 가로 넘침 없음, 패널 전체 화면, 상단바 압축(165→118px) | 완료 (목 서버 측정). 실제 휴대폰 접속은 HOST·API_TOKEN 설정 후 |
 | 실DB 통합 테스트 `api/test-db/` (`npm run test:db`, RealtyLog_TEST 전용 — 등록·스냅샷·복사값·증감·정정·무효·비교·DENY·쿼터·학교·일정) | 작성 완료, **DB 설정 전이라 건너뜀** |
-| A4 월 리포트, 실거래 배치, 마스터 재검증 | 대기 (공공 API 응답 확인 필요) |
+| A4 월 리포트, 마스터 재검증 | 대기 |
 | A6 가계 예산 연동 | 대기 (U14) |
 
+## 실DB 확인 (2026-11-01)
+- DEV·TEST DB와 로그인 생성 완료(사용자). DEV `npm run migrate` → 001~003 + seed 적용, `/api/health` schemaVersion 3
+- DEV 읽기 API 전부 200, 앱 로그인으로 snapshot/snapshot_value/snapshot_void UPDATE·DELETE 거부 확인
+- 수정: 없는 `/geo/*.json` 요청에 SPA fallback이 index.html을 돌려주던 문제 → 확장자 있는 경로는 404
+- `.claude/launch.json` 에 `aptlog-dev`(`.env`), `aptlog-test`(`.env.test`) — 둘 다 5180, 빌드된 화면 포함
+- TEST: `npm run test:db` 4건 통과. 화면에서 단지 선택 → 요약 패널 → 상세 8개 탭 → 새 스냅샷(복사값 확인 단계 → 저장 → 증감 ▲2,000만) 확인
+- 수정: 지도 키 없을 때 `NullMapAdapter`가 마커를 안 그려 단지 선택 불가 → 말풍선 목록으로 표시(클릭·Ctrl 다중 선택)
+- 수정: API 응답 Date가 UTC(`…Z`)로 나가 화면 날짜가 하루 전으로 보임 → `json replacer`로 KST 로컬 문자열(`localDateTime`). MasterService 마스터 비교의 `toISOString()` 날짜도 로컬 `ymd`로
+
+## 실제 공공데이터 연동 (2026-11-01)
+- 매매·전월세 실거래 API 실제 응답 확보(docs/api-samples, 테스트 픽스처 api/test/fixtures). 매매 응답에 aptSeq 없음 → 법정동코드+지번(+단지명) 연결
+- 단지 식별정보 CSV: 아파트 46,385건 DEV·TEST 적재, 시군구 252개 region 자동 추가 → 경계 데이터 없이도 단지 등록 가능
+- 한 필지 다단지(약 15%): 실거래 aptNm = 식별정보 공시가격 단지명으로 구분 (봉천동 1712 관악드림 삼성/동아 실데이터 확인)
+- 요약·비교 패널 "최근 실거래": 스냅샷 값 없으면 수집 실거래(선택 평형 ±오차, 해제 제외) 표시, 괴리율도 이를 기준(`gapBase`)
+- 실DB 테스트 5건 통과(가짜 응답으로 적재→연결→해제 갱신 포함)
+- 주의: `.env`가 TEST로 바뀌어 있어 DEV로 되돌림(DB 이름·계정 3줄). 비밀번호는 DEV·TEST 동일한 것으로 확인됨
+
 ## 다음 할 일
-1. **사용자**: `setup-sqlserver.ps1 -Env DEV` → `.env` → `npm run migrate` → `npm run dev:api` + `npm run dev:web` 로 실사용 확인
-   - 통합 테스트용: `setup-sqlserver.ps1 -Env TEST` → `.env.test` → `npm run test:db`
+1. **사용자**: DEV 화면(`npm run build` 후 `npm start`)에서 [단지 추가] → 단지 식별정보 검색으로 관심 단지 등록 → [이 시군구 실거래 12개월 받기]
+2. **사용자**: `scriptsegister-trade-task.ps1` 로 주간 실거래 동기화 등록, 행정경계(admdongkor)·백업 복원 테스트
+3. (개발) 건축HUB 마스터, A4 월 리포트, 마스터 재검증, 위치 미니맵(지도 키 후), A6(U14 후)
 2. **사용자**: admdongkor 다운로드 → `npm run geo:build`, 백업→복원 테스트
 3. **사용자**: 공공데이터포털·NCP·카카오 키 → `node scripts/probe-api.js` → docs/api-samples/ 확인
 4. (개발) `npm run test:db` 실제 실행·수정, probe 결과로 external/kapt·bldHub·rtms 클라이언트 + 등록·배치·A4 월 리포트 구현

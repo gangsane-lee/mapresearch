@@ -170,3 +170,45 @@ test('학교 배정 이력·일정 완료 연결', { skip }, async () => {
   const cal = await listCalendar(pool, '2026-10-01', '2026-10-31');
   assert.equal(cal.visits.find((v) => v.visitId === visitId).plannedTime, '14:30');
 });
+
+test('실거래 적재(가짜 응답) → 같은 필지 두 단지 이름으로 구분 연결 → 재적재·해제 갱신', { skip }, async () => {
+  const { syncTrades } = await import('../src/services/TradeSyncService.js');
+  const { kaptDraft } = await import('../src/services/KaptService.js');
+  const n = Date.now() % 1e8;
+  const id = (k) => `99${String(n).padStart(10, '0')}${k}`; // 14자리
+  const jibun = String(9000 + (n % 999));
+  for (const [k, nm] of [['01', `가동${tag}`], ['02', `나동${tag}`]]) {
+    await pool.request().input('d', sql.Char(14), id(k)).input('j', sql.NVarChar(30), jibun).input('nm', sql.NVarChar(100), nm).query(`
+      INSERT dbo.kapt_ref (danji_id, pnu, sigungu_cd, bjd_cd, umd_nm, jibun, addr, nm_price, danji_kind, hhld_cnt, base_date)
+      VALUES (@d, '1162010100190000000', '11620', '1162010100', N'봉천동', @j, N'서울특별시 관악구 봉천동 ' + @j, @nm, 1, 100, '2026-08-31')`);
+  }
+  const deal = (aptNm, extra = {}) => ({ sigunguCd: '11620', umdNm: '봉천동', jibun, aptNm, aptSeq: null, dealDate: '2026-09-15', exclM2: 59.9,
+    floor: 5, dong: null, amountMan: 100000, canceled: false, cancelDate: null, dealType: '중개거래', ...extra });
+  let saleRows = [deal(`가동${tag}`), deal(`가동${tag}`, { floor: 7, exclM2: 84.9 }), deal(`나동${tag}`, { floor: 3 })];
+  const fetchMonth = async ({ kind }) => (kind === 'SALE' ? saleRows : []);
+  const now = new Date(2026, 8, 20);
+
+  const r1 = await syncTrades(pool, { serviceKey: 'x', sigunguCd: '11620', months: 1, now, fetchMonth });
+  assert.equal(r1.results[0].inserted, 3);
+  assert.equal(r1.results[0].noBjd, 0);
+
+  const d = await kaptDraft(pool, id('01'));
+  assert.equal(d.tradeCnt, 2, '같은 필지의 다른 단지(나동) 거래는 평형 후보에서 제외');
+  const { complexId } = await createManual(pool, { ...d.body, areaTypes: d.areaCandidates.map((a, i) => ({ label: a.label, exclM2: a.exclM2, isPrimary: i === 0 })) });
+  await assert.rejects(createManual(pool, { ...d.body, areaTypes: [{ label: 'x', exclM2: 59.9 }] }), (e) => e.code === 'CONFLICT');
+
+  saleRows = [deal(`가동${tag}`, { canceled: true, cancelDate: '2026-09-30' }), saleRows[1], saleRows[2]];
+  const r2 = await syncTrades(pool, { serviceKey: 'x', sigunguCd: '11620', months: 1, now, fetchMonth });
+  assert.deepEqual([r2.results[0].inserted, r2.results[0].updated], [0, 3], '해제는 같은 자연키 행 갱신');
+  assert.equal(r2.linked.trade, 2);
+
+  const { listTrades } = await import('../src/services/TradeService.js');
+  const t = await listTrades(pool, complexId, { from: '2026-01-01' });
+  assert.equal(t.sales.length, 2);
+  assert.equal(t.sales.find((s) => s.canceled).cancelDate, '2026-09-30');
+  const cmp = await compare(pool, [complexId], { asOf: '2026-10-01' });
+  assert.equal(cmp.items[0].trade, null, '대표 평형(59.9)의 유일한 거래는 해제 → 최근 실거래 없음');
+  const a84 = (await getComplex(pool, complexId)).areaTypes.find((x) => x.exclM2 === 84.9).areaTypeId;
+  const cmp84 = await compare(pool, [complexId], { asOf: '2026-10-01', areas: new Map([[complexId, a84]]) });
+  assert.deepEqual(cmp84.items[0].trade, { dealDate: '2026-09-15', amountMan: 100000, floor: 7 });
+});

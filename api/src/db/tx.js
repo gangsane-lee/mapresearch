@@ -20,4 +20,7 @@ const pad = (n) => String(n).padStart(2, '0');
 export const ymd = (d) =>
   d == null ? null : d instanceof Date ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` : String(d).slice(0, 10);
 
+/** mssql datetime2 → 'YYYY-MM-DDTHH:mm:ss' KST 로컬 (Z 없음 — 앞 10자가 곧 로컬 날짜) */
+export const localDateTime = (d) => `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
 export const num = (v) => (v == null ? null : Number(v));

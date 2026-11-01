@@ -15,3 +15,7 @@ scripts/service/logs/
 # 로컬 미리보기 설정 (스크래치 경로 포함)
 .claude/launch.json
 .env.test
+
+# 내려받은 원본 데이터 (재배포 금지·대용량)
+/*.csv
+data/raw/
