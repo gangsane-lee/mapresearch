@@ -9,7 +9,8 @@
 - Vite 8, Pinia 4, vue-router 5, Express 5, zod 4는 최근 메이저 버전 → 기억에 의존하지 말고 공식 문서·마이그레이션 가이드로 API 확인.
 
 ## 코드 규칙
-- 스택: Vue 3.5 + Vite 8 + Pinia 4, Express 5 + mssql 12, Node 24 LTS, SQL Server 2025 Express(`.\SQLEXPRESS`, 포트 1433).
+- 스택: Vue 3.5 + Vite 8 + Pinia 4, Express 5 + mssql 12, Node 24 LTS, SQL Server 2025 Express(포트 1433 — macOS는 `docker-compose.yml` 컨테이너, Windows는 `.\SQLEXPRESS`). 화면은 데스크톱 전용.
+- 스크립트는 OS 무관 Node(`scripts/*.js`)를 우선. `.ps1`은 Windows 전용 보조, macOS 자동 실행은 `scripts/mac/install-launchd.sh`.
 - DevExtreme 사용 금지(라이선스). UI는 PrimeVue, 차트는 ECharts(`echarts/core` 모듈 import)를 래퍼 컴포넌트로 감싼다.
 - 지도 SDK는 `web/src/map/MapAdapter` 인터페이스 뒤에서만 호출.
 - 금액은 DB·API 모두 만원 정수. 억 변환은 화면에서만.
@@ -27,6 +28,6 @@
 
 ## 안전
 - 파일 삭제, DB DROP/TRUNCATE, 백업 스크립트의 `robocopy /MIR` 사용 금지. 필요 시 사용자 확인.
-  - 유일한 예외: `scripts/backup.ps1`의 보관 정리 — `BACKUP_ROOT\db\RealtyLog_*_yyyyMMdd.bak` 패턴 중 14일 경과 파일만 삭제(계획서 §8).
+  - 유일한 예외: `scripts/backup.js`·`scripts/backup.ps1`의 보관 정리 — `BACKUP_ROOT\db\RealtyLog_*_yyyyMMdd.bak` 패턴 중 14일 경과 파일만 삭제(계획서 §8).
 - 운영 DB(`RealtyLog_PROD`) 대상 마이그레이션 전 백업 실행. 개발·테스트는 `RealtyLog_DEV`에서.
 - SQL Server 구성 변경(포트·서비스 재시작·로그인 생성)은 관리자 권한 작업이므로 사용자에게 안내하고 직접 실행하게 한다.

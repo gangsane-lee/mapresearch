@@ -1,4 +1,4 @@
-// 마지막 백업 결과 (scripts/backup.ps1 이 BACKUP_ROOT\logs\last_backup.json 에 기록)
+// 마지막 백업 결과 (scripts/backup.js 또는 backup.ps1 이 BACKUP_ROOT/logs/last_backup.json 에 기록)
 import { Router } from 'express';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';

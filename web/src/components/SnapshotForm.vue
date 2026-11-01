@@ -240,27 +240,26 @@ onMounted(load);
 input, select, textarea { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--text); }
 textarea { width: 100%; resize: vertical; }
 .small { font-size: 13px; }
-.master { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 12px; background: #f1f5f9; border-radius: var(--radius); margin: 12px 0; }
+.master { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); margin: 12px 0; }
 .master h3 { width: 100%; margin: 0; font-size: 14px; }
 .group { margin-top: 18px; }
 .group h3 { font-size: 15px; margin: 0 0 8px; border-bottom: 2px solid var(--text); padding-bottom: 4px; }
 .row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--line); }
-.row.changed { background: #fefce8; }
+.row.changed { background: var(--tint-warn); }
 .control { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .control > input:not([type='checkbox']):not([type='radio']), .control > select { min-width: 200px; }
 .bool { display: flex; gap: 12px; }
-.badge { font-size: 11px; background: #e2e8f0; color: var(--muted); border-radius: 4px; padding: 1px 6px; }
-.badge.prefill { background: #e0f2fe; color: #0369a1; }
+.badge { font-size: 11px; background: var(--surface-2); color: var(--muted); border-radius: 4px; padding: 1px 6px; }
+.badge.prefill { background: var(--tint-info); color: var(--down); }
 .confirm { font-size: 12px; color: var(--muted); display: flex; gap: 4px; align-items: center; }
 .commute { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 14px; }
 .commute th, .commute td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
 .commute input.num { width: 70px; }
 .commute td:last-child input { width: 100%; }
 .banner { padding: 10px 12px; border-radius: var(--radius); margin: 8px 0; }
-.banner.warn { background: #fffbeb; border: 1px solid #fcd34d; }
+.banner.warn { background: var(--tint-warn); border: 1px solid var(--warn-line); }
 .banner ul { margin: 6px 0 10px; }
 .banner .btn { margin-right: 8px; }
 .err { color: var(--up); font-size: 13px; }
 footer .err { margin-right: auto; }
-@media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
 </style>

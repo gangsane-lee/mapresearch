@@ -23,9 +23,10 @@ import { createVisit, patchVisit, listCalendar } from '../src/services/VisitServ
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const skip = process.env.DB_NAME !== 'RealtyLog_TEST' ? 'DB_NAME=RealtyLog_TEST 일 때만 실행 (.env.test)' : false;
 let pool;
-const tag = `T${Date.now().toString(36)}`;
 const pad = (n) => String(n).padStart(2, '0');
 const d = new Date();
+// 실행마다 겹치지 않는 표시 — 화면에서 테스트 데이터임을 바로 알 수 있게 "시험 MMDD-HHmmss" 형식
+const tag = ` 시험 ${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 before(async () => {
@@ -137,12 +138,12 @@ test('앱 로그인은 스냅샷 UPDATE/DELETE 불가 (DENY)', { skip }, async (
 });
 
 test('쿼터 가드: 한도 초과 시 차단, 미설정 API 거부', { skip }, async () => {
-  const api = `TEST_${tag}`.slice(0, 30);
+  const api = `TEST_${tag.replace(/\D/g, '')}`;
   await pool.request().input('k', sql.VarChar(60), `quota.${api}.DAY`).query("INSERT dbo.setting (setting_key, setting_val) VALUES (@k, N'2')");
   await consume(pool, api);
   await consume(pool, api);
   await assert.rejects(consume(pool, api), (e) => e.code === 'QUOTA_EXCEEDED');
-  await assert.rejects(consume(pool, `NONE_${tag}`), (e) => e.code === 'QUOTA_NOT_CONFIGURED');
+  await assert.rejects(consume(pool, `NONE_${tag.replace(/\D/g, '')}`), (e) => e.code === 'QUOTA_NOT_CONFIGURED');
 });
 
 test('학교 배정 이력·일정 완료 연결', { skip }, async () => {
@@ -211,4 +212,16 @@ test('실거래 적재(가짜 응답) → 같은 필지 두 단지 이름으로 
   const a84 = (await getComplex(pool, complexId)).areaTypes.find((x) => x.exclM2 === 84.9).areaTypeId;
   const cmp84 = await compare(pool, [complexId], { asOf: '2026-10-01', areas: new Map([[complexId, a84]]) });
   assert.deepEqual(cmp84.items[0].trade, { dealDate: '2026-09-15', amountMan: 100000, floor: 7 });
+
+  // 지도 우클릭 → 같은 필지 두 단지가 후보, 실거래는 단지명으로 나뉜다
+  const { kaptAt } = await import('../src/services/KaptService.js');
+  const at = (await kaptAt(pool, { bjdCd: '1162010100', jibun, top: 50 })).filter((c) => c.danjiId.startsWith(id('')));
+  const ga = at.find((c) => c.danjiId === id('01'));
+  const na = at.find((c) => c.danjiId === id('02'));
+  assert.deepEqual([ga.match, na.match], ['EXACT', 'EXACT']);
+  assert.equal(ga.complexId, complexId, '등록된 단지는 complexId 로 표시');
+  assert.deepEqual([ga.tradeCnt, ga.lastTrade.amountMan, ga.lastTrade.exclM2], [1, 100000, 84.9], '해제 거래 제외');
+  assert.deepEqual([na.tradeCnt, na.complexId], [1, null]);
+  const sub = (await kaptAt(pool, { bjdCd: '1162010100', jibun: `${jibun}-7`, top: 50 })).find((c) => c.danjiId === id('01'));
+  assert.equal(sub.match, 'SAME_BON', '부번이 달라도 같은 본번이면 후보');
 });

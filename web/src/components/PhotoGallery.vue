@@ -159,7 +159,7 @@ select { padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; }
 .results li.fail { color: var(--warn); }
 h4 { font-size: 14px; margin: 16px 0 8px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
-figure { margin: 0; cursor: zoom-in; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #f8fafc; }
+figure { margin: 0; cursor: zoom-in; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
 figure img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; }
 figcaption { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; }
 .viewer { position: fixed; inset: 0; background: rgb(0 0 0 / 0.85); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: zoom-out; }

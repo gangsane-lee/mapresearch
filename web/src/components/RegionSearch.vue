@@ -70,13 +70,19 @@ function onKey(e) {
 
 <style scoped>
 .region-search { position: relative; display: flex; align-items: center; gap: 8px; }
-input { width: 260px; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
-.dropdown {
-  position: absolute; top: 100%; left: 0; z-index: 50; width: 260px; margin: 4px 0 0; padding: 4px 0;
-  list-style: none; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12); max-height: 360px; overflow: auto;
+input {
+  width: 260px; padding: 8px 12px 8px 34px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%236e7480' stroke-width='1.6'%3E%3Ccircle cx='7' cy='7' r='5'/%3E%3Cpath d='m11 11 3.5 3.5'/%3E%3C/svg%3E")
+    no-repeat 12px 50%;
+  transition: background-color 0.15s, border-color 0.15s;
 }
-.dropdown li { display: flex; justify-content: space-between; padding: 6px 10px; cursor: pointer; }
-.dropdown li.active, .dropdown li:hover { background: #eff6ff; }
+input:focus { background-color: var(--panel); }
+.dropdown {
+  position: absolute; top: 100%; left: 0; z-index: 50; width: 260px; margin: 6px 0 0; padding: 6px;
+  list-style: none; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow-float); max-height: 360px; overflow: auto;
+}
+.dropdown li { display: flex; justify-content: space-between; padding: 7px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+.dropdown li.active, .dropdown li:hover { background: var(--accent-soft); }
 .current button { border: 0; background: none; color: inherit; padding: 0 0 0 4px; }
 </style>

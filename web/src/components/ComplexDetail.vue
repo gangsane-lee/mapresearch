@@ -10,6 +10,8 @@ import { api } from '../api/client.js';
 import { STATUS, formatMan, formatDeltaMan } from '../util/format.js';
 import { enumLabel, enumOrd, ageLabel } from '../util/compare.js';
 
+const pct = (v) => (v == null ? '-' : `${v}%`);
+
 const props = defineProps({ complexId: { type: Number, required: true } });
 const emit = defineEmits(['correct', 'changed']);
 
@@ -167,19 +169,19 @@ defineExpose({ reload: load });
             <dt>상태</dt><dd>{{ STATUS[detail.status]?.label }}</dd>
             <dt>주소</dt><dd>{{ detail.jibunAddr ?? '-' }}</dd>
             <dt>연식</dt><dd>{{ ageLabel(detail.master?.useAprDay) }}</dd>
-            <dt>세대수 / 동</dt><dd>{{ detail.master?.hhldCnt ?? '-' }} / {{ detail.master?.dongCnt ?? '-' }}</dd>
+            <dt>세대수 / 동</dt><dd>{{ detail.master?.hhldCnt?.toLocaleString() ?? '-' }} / {{ detail.master?.dongCnt ?? '-' }}</dd>
             <dt>최고층</dt><dd>{{ detail.master?.maxFloor ?? '-' }}</dd>
             <dt>복도유형</dt><dd>{{ detail.master?.hallType ?? '-' }}</dd>
-            <dt>용적률 / 건폐율</dt><dd>{{ detail.master?.farRatio ?? '-' }}% / {{ detail.master?.bcRatio ?? '-' }}%</dd>
+            <dt>용적률 / 건폐율</dt><dd>{{ pct(detail.master?.farRatio) }} / {{ pct(detail.master?.bcRatio) }}</dd>
             <dt>시공사</dt><dd>{{ detail.master?.builder ?? '-' }}</dd>
             <dt>태그</dt><dd><span v-for="t in detail.tags" :key="t" class="chip">#{{ t }}</span></dd>
           </dl>
           <h3>평형</h3>
           <table class="tbl">
-            <thead><tr><th>라벨</th><th>전용㎡</th><th>방/화</th><th /></tr></thead>
+            <thead><tr><th>라벨</th><th>전용㎡</th><th>방/화</th><th>비고</th><th /></tr></thead>
             <tbody>
               <tr v-for="a in detail.areaTypes" :key="a.areaTypeId">
-                <td>{{ a.label }}</td><td>{{ a.exclM2 }}</td><td>{{ a.rooms ?? '-' }}/{{ a.baths ?? '-' }}</td><td>{{ a.isPrimary ? '대표' : '' }}</td>
+                <td>{{ a.label }}</td><td>{{ a.exclM2 }}</td><td>{{ a.rooms ?? '-' }}/{{ a.baths ?? '-' }}</td><td>{{ a.note ?? '' }}</td><td>{{ a.isPrimary ? '대표' : '' }}</td>
               </tr>
             </tbody>
           </table>
@@ -319,7 +321,7 @@ defineExpose({ reload: load });
               </tr>
             </tbody>
           </table>
-          <p v-if="!trades.sales.length" class="muted">수집된 매매 실거래가 없습니다 (실거래 배치는 API 키 등록 후 동작).</p>
+          <p v-if="!trades.sales.length" class="muted">수집된 매매 실거래가 없습니다 (단지 식별정보로 등록해 법정동·지번이 있는 단지만 연결되며, 설정에서 실거래를 동기화).</p>
         </div>
         <div>
           <h3>전월세</h3>
@@ -377,10 +379,10 @@ dd { margin: 0; }
 .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
 .timeline { list-style: none; padding: 0; margin: 8px 0; }
 .timeline li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; padding: 8px 10px; border-left: 3px solid var(--line); cursor: pointer; }
-.timeline li.on { border-color: var(--accent); background: #eff6ff; }
+.timeline li.on { border-color: var(--accent); background: var(--accent-soft); }
 .timeline li.voided { opacity: 0.55; }
 .banner { padding: 10px 12px; border-radius: var(--radius); margin-bottom: 16px; }
-.banner.warn { background: #fffbeb; border: 1px solid #fcd34d; }
+.banner.warn { background: var(--tint-warn); border: 1px solid var(--warn-line); }
 .banner .btn { margin-right: 8px; }
 .note { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
 .note p { margin: 4px 0; white-space: pre-wrap; }

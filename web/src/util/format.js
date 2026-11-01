@@ -30,25 +30,31 @@ export function isStale(dateStr, staleDays = 30, today = new Date()) {
 }
 
 export const STATUS = {
-  INTEREST: { label: '관심', color: '#64748b' },
-  VISIT_PLANNED: { label: '임장 예정', color: '#0ea5e9' },
-  VISITED: { label: '임장 완료', color: '#2563eb' },
-  CANDIDATE: { label: '매수 후보', color: '#16a34a' },
-  ON_HOLD: { label: '보류', color: '#d97706' },
-  EXCLUDED: { label: '제외', color: '#9ca3af' },
+  INTEREST: { label: '관심', color: '#7b8494' },
+  VISIT_PLANNED: { label: '임장 예정', color: '#4b8aa8' },
+  VISITED: { label: '임장 완료', color: '#2b5a96' },
+  CANDIDATE: { label: '매수 후보', color: '#2e7552' },
+  ON_HOLD: { label: '보류', color: '#c08a2e' },
+  EXCLUDED: { label: '제외', color: '#a5a8ad' },
 };
 
-/** 지도 말풍선 HTML (단지명·대표 평형 호가·직전 대비·상태 색) — 사용자 입력은 모두 이스케이프 */
+/**
+ * 지도 명패 HTML — 위 칸: 대표 평형 호가(없으면 단지명)·직전 대비, 아래 칸: 상태 점·단지명·평형.
+ * 사용자 입력은 모두 이스케이프
+ */
 export function markerHtml(c) {
   const st = STATUS[c.status] ?? STATUS.INTEREST;
   const delta = formatDeltaMan(c.priceAskDelta);
   const dCls = c.priceAskDelta > 0 ? 'up' : c.priceAskDelta < 0 ? 'down' : '';
-  const price = c.priceAsk != null ? `${escapeHtml(c.areaLabel ?? '')} ${formatMan(c.priceAsk)}` : '호가 미입력';
+  const hasPrice = c.priceAsk != null;
+  const name = escapeHtml(c.displayNm);
   const flag = c.flags?.length ? `<span class="flag" title="${escapeHtml(c.flags.map((f) => f.label).join(', '))}">!</span>` : '';
+  const top = hasPrice ? `<b class="amt">${formatMan(c.priceAsk)}</b>` : `<b class="amt nm">${name}</b>`;
+  const sub = hasPrice ? `${name}${c.areaLabel ? ` <em>${escapeHtml(c.areaLabel)}</em>` : ''}` : '호가 미입력';
   return (
-    `<div class="bubble" style="--st:${st.color}">` +
-    `<b>${flag}${escapeHtml(c.displayNm)}</b>` +
-    `<span class="price">${price}${delta ? ` <i class="${dCls}">${delta}</i>` : ''}</span>` +
+    `<div class="bubble" style="--st:${st.color}" title="${st.label}">` +
+    `<span class="top">${flag}${top}${delta ? `<i class="${dCls}">${delta}</i>` : ''}</span>` +
+    `<span class="sub">${sub}</span>` +
     `</div>`
   );
 }

@@ -61,7 +61,7 @@ h3 { font-size: 15px; margin: 20px 0 8px; }
 .row input { padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl th, .tbl td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: left; }
-.tbl tr.linked td { background: #ecfdf5; }
+.tbl tr.linked td { background: var(--tint-good); }
 .small { font-size: 12px; }
 .err { color: var(--up); }
 </style>

@@ -1,6 +1,6 @@
 // ECharts option 생성 (순수 함수 — 테스트 대상). 금액은 만원 → 억 표시.
 const eok = (man) => (man == null ? null : Math.round((man / 10000) * 100) / 100);
-const PALETTE = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
+const PALETTE = ['#1b2430', '#8e6f3a', '#2b5a96', '#2e7552', '#b23a2a', '#6e7480'];
 
 const baseGrid = { left: 56, right: 56, top: 40, bottom: 56 };
 // 눈금은 최소 1개월 간격 (짧은 기간에서 같은 월 라벨이 겹치지 않도록)

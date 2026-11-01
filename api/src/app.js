@@ -55,7 +55,7 @@ export function createApp({ config, getPool, webDist = defaultWebDist }) {
   app.use('/api/schools', schoolsRouter({ getPool }));
   app.use('/api/visits', visitsRouter({ getPool }));
   app.use('/api/redev-refs', redevRouter({ getPool }));
-  app.use('/api/kapt', kaptRouter({ getPool }));
+  app.use('/api/kapt', kaptRouter({ getPool, config }));
   app.use('/api/sync', syncRouter({ getPool, config }));
   app.use('/api/media', mediaApiRouter({ getPool, config }));
   app.use('/media', mediaFileRouter({ getPool, config }));

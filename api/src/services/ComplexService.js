@@ -14,8 +14,11 @@ export async function listSummary(pool) {
            ls.last_observed_at,
            tg.tags,
            t1.amount_man AS last_trade_man, t1.deal_date AS last_trade_date,
-           t2.amount_man AS prev_trade_man, t2.deal_date AS prev_trade_date
+           t2.amount_man AS prev_trade_man, t2.deal_date AS prev_trade_date,
+           m.use_apr_day, m.hhld_cnt, rg.sgg_nm, rg.city_nm
     FROM dbo.complex c
+    LEFT JOIN dbo.master_revision m ON m.complex_id = c.complex_id AND m.status = 'CURRENT'
+    LEFT JOIN dbo.region rg ON rg.sigungu_cd = c.sigungu_cd
     LEFT JOIN dbo.area_type a ON a.complex_id = c.complex_id AND a.is_primary = 1
     OUTER APPLY (SELECT TOP (1) tr.amount_man, tr.deal_date, tr.trade_id FROM dbo.trade tr
                  WHERE tr.complex_id = c.complex_id AND tr.cancel_flag = 0 AND ABS(tr.excl_m2 - a.excl_m2) <= @tol
@@ -66,5 +69,8 @@ export function toSummary(row, gapThresholdPct = -5) {
     priceAskDelta: num(row.price_ask_delta),
     lastObservedAt: ymd(row.last_observed_at),
     tags: row.tags ? row.tags.split('|') : [],
+    useAprDay: ymd(row.use_apr_day),
+    hhldCnt: row.hhld_cnt ?? null,
+    sggNm: row.sgg_nm ? [row.city_nm, row.sgg_nm].filter(Boolean).join(' ') : null,
   };
 }

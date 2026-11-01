@@ -124,13 +124,13 @@ const STATUS = { PLANNED: '예정', DONE: '완료', CANCELED: '취소' };
 .cal { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
 .cal th { padding: 4px; color: var(--muted); }
 .cal td { height: 72px; vertical-align: top; border: 1px solid var(--line); padding: 2px 4px; cursor: pointer; overflow: hidden; }
-.cal td.out { background: #f8fafc; color: var(--muted); }
+.cal td.out { background: var(--surface-2); color: var(--muted); }
 .cal td.today .day { background: var(--accent); color: #fff; border-radius: 50%; padding: 0 5px; }
 .cal td.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
 .day { display: inline-block; margin-bottom: 2px; }
 .ev { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev.plan { color: var(--accent); }
-.ev.plan.done { color: #16a34a; }
+.ev.plan.done { color: var(--good); }
 .ev.plan.canceled { color: var(--muted); text-decoration: line-through; }
 .ev.snap { color: var(--text); }
 .day-detail h3 { font-size: 15px; margin: 12px 0 6px; }

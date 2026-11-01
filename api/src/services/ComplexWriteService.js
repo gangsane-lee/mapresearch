@@ -31,6 +31,7 @@ const areaInput = z.object({
   rooms: z.number().int().min(0).max(10).nullish(),
   baths: z.number().int().min(0).max(10).nullish(),
   hhldCnt: z.number().int().min(0).nullish(),
+  note: z.string().trim().max(200).nullish(),
   isPrimary: z.boolean().default(false),
 });
 
@@ -130,10 +131,11 @@ export async function createManual(pool, body) {
         .input('ro', sql.TinyInt, a.rooms ?? null)
         .input('ba', sql.TinyInt, a.baths ?? null)
         .input('h', sql.Int, a.hhldCnt ?? null)
+        .input('n', sql.NVarChar(200), a.note || null)
         .input('p', sql.Bit, a.isPrimary)
         .input('o', sql.Int, sort++).query(`
-          INSERT dbo.area_type (complex_id, label, excl_m2, supply_m2, rooms, baths, hhld_cnt, is_primary, sort)
-          VALUES (@c, @l, @e, @s, @ro, @ba, @h, @p, @o)`);
+          INSERT dbo.area_type (complex_id, label, excl_m2, supply_m2, rooms, baths, hhld_cnt, note, is_primary, sort)
+          VALUES (@c, @l, @e, @s, @ro, @ba, @h, @n, @p, @o)`);
     }
 
     const m = v.master;
@@ -224,6 +226,7 @@ export async function getComplex(pool, complexId) {
       rooms: a.rooms,
       baths: a.baths,
       hhldCnt: a.hhld_cnt,
+      note: a.note ?? null,
       isPrimary: !!a.is_primary,
     })),
     master: revs.find((r) => r.status === 'CURRENT') ?? null,

@@ -28,9 +28,9 @@ const emit = defineEmits(['toggle-status', 'toggle-tag', 'toggle-flagged']);
       v-for="(s, code) in STATUS"
       :key="code"
       type="button"
-      class="chip"
+      class="chip status"
       :class="{ on: statusFilter.has(code) }"
-      :style="{ borderColor: s.color }"
+      :style="{ '--dot': s.color }"
       @click="emit('toggle-status', code)"
     >
       {{ s.label }}
@@ -53,7 +53,7 @@ const emit = defineEmits(['toggle-status', 'toggle-tag', 'toggle-flagged']);
 
 <style scoped>
 .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.chip.flag { border-color: var(--warn); color: var(--warn); }
-.chip.flag.on { background: var(--warn); color: #fff; }
-.sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+.chip.flag { border-color: var(--warn-line); background: var(--tint-warn); color: var(--warn); font-weight: 600; }
+.chip.flag.on { background: var(--warn); border-color: var(--warn); color: #fff; }
+.sep { width: 1px; height: 16px; background: var(--line-strong); margin: 0 6px; }
 </style>

@@ -29,6 +29,12 @@ export const useSelectionStore = defineStore('selection', () => {
     }
   }
 
+  /** 영역 선택 등으로 여러 단지를 한 번에 선택 (기존 선택 교체) */
+  function replace(ids) {
+    lastWarning.value = null;
+    selectedIds.value = [...new Set(ids)].slice(0, MAX_COMPARE);
+  }
+
   function remove(id) {
     selectedIds.value = selectedIds.value.filter((x) => x !== id);
   }
@@ -40,5 +46,5 @@ export const useSelectionStore = defineStore('selection', () => {
 
   const isSelected = (id) => selectedIds.value.includes(id);
 
-  return { selectedIds, mode, lastWarning, select, remove, clear, isSelected };
+  return { selectedIds, mode, lastWarning, select, replace, remove, clear, isSelected };
 });

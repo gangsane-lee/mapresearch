@@ -166,7 +166,7 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
     <header>
       <h2>{{ mode === 'SUMMARY' ? '요약' : `비교 (${ids.length})` }}</h2>
       <small v-if="data" class="muted">기준일 {{ data.asOf }}</small>
-      <button type="button" class="btn" aria-label="패널 닫기" @click="emit('close')">닫기</button>
+      <button type="button" class="btn ghost" aria-label="패널 닫기" @click="emit('close')">닫기</button>
     </header>
     <p v-if="warning" class="warn">{{ warning }}</p>
     <p v-if="error" class="warn">{{ error }}</p>
@@ -174,26 +174,23 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
 
     <!-- 요약 -->
     <section v-if="mode === 'SUMMARY' && one" class="summary">
-      <h3>{{ one.displayNm }}</h3>
-      <span class="chip" :style="{ borderColor: statusOf(one).color, color: statusOf(one).color }">{{ statusOf(one).label }}</span>
-      <span class="muted small sgg">{{ one.sggNm }}</span>
-
+      <div class="hero">
+        <div class="hero-meta">
+          <span class="chip status" :style="{ '--dot': statusOf(one).color }">{{ statusOf(one).label }}</span>
+          <span class="sgg">{{ one.sggNm }}</span>
+        </div>
+        <h3>{{ one.displayNm }}</h3>
+        <div class="master">
+          <div><small>연식</small><b>{{ ageLabel(one.master.useAprDay) }}</b></div>
+          <div><small>세대수</small><b>{{ one.master.hhldCnt ? one.master.hhldCnt.toLocaleString() : '-' }}</b></div>
+          <div><small>복도</small><b>{{ one.master.hallType ?? '-' }}</b></div>
+          <div><small>용적률</small><b>{{ one.master.farRatio != null ? `${one.master.farRatio}%` : '-' }}</b></div>
+        </div>
+      </div>
       <p v-for="f in flagsOf(one.complexId)" :key="f.code" class="price-flag">! {{ f.label }}</p>
-      <div class="master">
-        <span>{{ ageLabel(one.master.useAprDay) }}</span>
-        <span>{{ one.master.hhldCnt ? `${one.master.hhldCnt.toLocaleString()}세대` : '세대수 -' }}</span>
-        <span>{{ one.master.hallType ?? '복도유형 -' }}</span>
-        <span>용적률 {{ one.master.farRatio ?? '-' }}%</span>
-      </div>
 
-      <div class="grades">
-        <span v-for="cd in ['grade_traffic', 'grade_env', 'grade_edu']" :key="cd" class="grade" :class="[`g-${v(one, cd) ?? 'none'}`, { stale: stale(obs(one, cd)) }]" :title="obs(one, cd) ? `관측 ${obs(one, cd)}` : '미입력'">
-          <small>{{ fieldOf(cd)?.label.replace(' 등급', '') }}</small>
-          <b>{{ v(one, cd) ?? '-' }}</b>
-        </span>
-      </div>
-
-      <div class="price">
+      <div class="block">
+        <h4>시세</h4>
         <div class="area-line">
           <span class="muted">{{ areaOf(one)?.label ?? '평형 미지정' }}</span>
           <select v-if="one.areaTypes.length > 1" :value="one.areaTypeId" aria-label="평형 선택" @change="setArea(one.complexId, $event.target.value)">
@@ -223,17 +220,30 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
         </dl>
       </div>
 
-      <dl class="dist">
-        <template v-for="a in data.anchors" :key="a.anchorId">
-          <template v-if="commuteOf(one, a.anchorId) || one.distances.find((d) => d.anchorId === a.anchorId)">
-            <dt>{{ a.name }}</dt>
-            <dd :class="{ stale: stale(commuteOf(one, a.anchorId)?.observedAt) }">
-              <template v-if="commuteOf(one, a.anchorId)">{{ commuteOf(one, a.anchorId).minutes }}분 · </template>
-              {{ one.distances.find((d) => d.anchorId === a.anchorId)?.km ?? '-' }}km
-            </dd>
+      <div class="block">
+        <h4>입지 등급</h4>
+        <div class="grades">
+          <span v-for="cd in ['grade_traffic', 'grade_env', 'grade_edu']" :key="cd" class="grade" :class="[`g-${v(one, cd) ?? 'none'}`, { stale: stale(obs(one, cd)) }]" :title="obs(one, cd) ? `관측 ${obs(one, cd)}` : '미입력'">
+            <small>{{ fieldOf(cd)?.label.replace(' 등급', '') }}</small>
+            <b>{{ v(one, cd) ?? '-' }}</b>
+          </span>
+        </div>
+      </div>
+
+      <div v-if="data.anchors.some((a) => commuteOf(one, a.anchorId) || one.distances.find((d) => d.anchorId === a.anchorId))" class="block">
+        <h4>출퇴근·거리</h4>
+        <dl class="dist">
+          <template v-for="a in data.anchors" :key="a.anchorId">
+            <template v-if="commuteOf(one, a.anchorId) || one.distances.find((d) => d.anchorId === a.anchorId)">
+              <dt>{{ a.name }}</dt>
+              <dd :class="{ stale: stale(commuteOf(one, a.anchorId)?.observedAt) }">
+                <template v-if="commuteOf(one, a.anchorId)">{{ commuteOf(one, a.anchorId).minutes }}분 · </template>
+                {{ one.distances.find((d) => d.anchorId === a.anchorId)?.km ?? '-' }}km
+              </dd>
+            </template>
           </template>
-        </template>
-      </dl>
+        </dl>
+      </div>
     </section>
 
     <!-- 비교 -->
@@ -284,40 +294,56 @@ const ranks = computed(() => rows.value.map((r) => (r.rank ? rankOf(items.value,
 
 <style scoped>
 .side-panel { width: 420px; max-width: 100vw; height: 100%; background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
-header, footer { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+header, footer { display: flex; align-items: center; gap: 8px; padding: 12px 20px; }
 header { border-bottom: 1px solid var(--line); }
-header h2 { margin: 0; font-size: 16px; flex: 1; }
-footer { border-top: 1px solid var(--line); margin-top: auto; justify-content: flex-end; }
-section { padding: 16px; overflow: auto; }
-.pad { padding: 16px; }
+header h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); flex: 1; }
+footer { border-top: 1px solid var(--line); margin-top: auto; justify-content: flex-end; background: var(--panel); }
+footer .btn.primary { flex: 1; text-align: center; }
+section { overflow: auto; }
+section.compare { padding: 16px 20px; }
+.pad { padding: 20px; }
 .small { font-size: 12px; }
-.sgg { margin-left: 6px; }
-h3 { margin: 0 0 6px; font-size: 18px; }
-.warn { margin: 8px 16px 0; color: var(--warn); }
-.price-flag { margin: 8px 0 0; padding: 4px 8px; border-radius: 6px; background: #fffbeb; color: var(--warn); font-size: 13px; }
-.master { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 12px 0; font-size: 13px; }
-.grades { display: flex; gap: 8px; margin-bottom: 12px; }
-.grade { flex: 1; text-align: center; border: 1px solid var(--line); border-radius: var(--radius); padding: 6px; }
-.grade small { display: block; color: var(--muted); font-size: 11px; }
-.grade b { font-size: 20px; }
-.g-S b { color: #16a34a; } .g-A b { color: #2563eb; } .g-B b { color: #d97706; } .g-C b { color: #dc2626; }
-.price { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.warn { margin: 10px 20px 0; color: var(--warn); }
+
+/* 히어로: 잉크 바탕에 단지명과 기본 정보 한 줄 */
+.hero { background: var(--ink); color: #fff; padding: 20px 20px 18px; }
+.hero-meta { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: rgb(255 255 255 / 0.7); }
+.hero .chip.status { background: rgb(255 255 255 / 0.1); border-color: rgb(255 255 255 / 0.2); color: #fff; }
+h3 { margin: 8px 0 16px; font-family: var(--serif); font-size: 25px; font-weight: 700; line-height: 1.3; letter-spacing: -0.03em; }
+.master { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid rgb(255 255 255 / 0.14); padding-top: 12px; }
+.master div + div { border-left: 1px solid rgb(255 255 255 / 0.14); padding-left: 12px; }
+.master small { display: block; font-size: 11px; color: var(--champagne); opacity: 0.85; }
+.master b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.price-flag { margin: 0; padding: 10px 20px; background: var(--tint-warn); border-bottom: 1px solid var(--warn-line); color: var(--warn); font-size: 13px; font-weight: 500; }
+
+/* 블록 사이 굵은 띠로 구획 */
+.block { padding: 18px 20px 20px; border-top: 8px solid var(--bg); }
+.hero + .block, .price-flag + .block { border-top: 0; }
+h4 { margin: 0 0 10px; font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+.grades { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-radius: var(--radius); }
+.grade { text-align: center; padding: 10px 6px; }
+.grade + .grade { border-left: 1px solid var(--line); }
+.grade small { display: block; color: var(--muted); font-size: 11.5px; }
+.grade b { font-family: var(--serif); font-size: 22px; font-weight: 700; }
+.g-S b { color: var(--good); } .g-A b { color: var(--down); } .g-B b { color: var(--warn); } .g-C b { color: var(--up); }
 .area-line { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-.ask { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
-.ask b { font-size: 22px; }
-.spark { width: 100%; height: 32px; }
-.spark path { fill: none; stroke: var(--accent); stroke-width: 1.6; }
-dl { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; margin: 8px 0 0; font-size: 13px; }
+.ask { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 4px 0 2px; }
+.ask b { font-family: var(--serif); font-size: 32px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.ask span { font-weight: 600; }
+.spark { width: 100%; height: 36px; margin: 6px 0 2px; }
+.spark path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; }
+dl { display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; margin: 12px 0 0; font-size: 13px; }
 dt { color: var(--muted); }
-dd { margin: 0; }
-.dist { margin-top: 14px; }
+dd { margin: 0; font-weight: 500; }
+.dist { margin: 0; }
+.block dl:not(.dist) { padding-top: 12px; border-top: 1px solid var(--line); }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 th, td { border-bottom: 1px solid var(--line); padding: 5px 6px; text-align: left; vertical-align: top; }
-thead th { position: sticky; top: 0; background: var(--panel); padding-right: 18px; }
+thead th { position: sticky; top: 0; background: var(--panel); padding-right: 18px; font-family: var(--serif); font-size: 13.5px; }
 tbody th { color: var(--muted); font-weight: 500; white-space: nowrap; }
-tr.sec th { background: #f1f5f9; color: var(--text); font-weight: 700; }
-.best { background: #ecfdf5; font-weight: 600; }
-.worst { background: #fef2f2; }
+tr.sec th { background: var(--surface-2); color: var(--text); font-weight: 700; }
+.best { background: var(--tint-good); font-weight: 600; }
+.worst { background: var(--tint-bad); }
 .x { position: absolute; margin-left: 4px; border: 0; background: none; color: var(--muted); }
 select { font-size: 12px; padding: 2px 4px; }
 </style>

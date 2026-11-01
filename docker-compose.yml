@@ -1,0 +1,28 @@
+# macOS(Apple Silicon 포함)용 SQL Server 2025 — README "맥미니 설치" 참고
+#   docker compose up -d        (프로젝트 폴더의 .env 에서 MSSQL_SA_PASSWORD, BACKUP_ROOT 를 읽는다)
+#
+# - SQL Server 리눅스 이미지는 amd64 전용 → Apple Silicon 은 Docker Desktop 의 Rosetta 에뮬레이션으로 실행
+# - 001_init 이후 호환성 수준 170 을 쓰므로 2025 이미지가 필요 (2022 는 160 까지)
+# - 127.0.0.1 에만 열어 같은 망 다른 PC 에서 접속하지 못하게 한다 (계획서 §2.1)
+# - TZ=Asia/Seoul: SYSDATETIME() 이 KST 가 되도록 (일시는 KST 로컬 시각 규칙)
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    platform: linux/amd64
+    container_name: aptlog-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?.env 에 MSSQL_SA_PASSWORD 를 넣으세요}
+      MSSQL_COLLATION: Korean_Wansung_CI_AS
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - aptlog-mssql-data:/var/opt/mssql
+      # 백업 파일은 맥 폴더(BACKUP_ROOT/db)에 바로 떨어지게 — .env 의 BACKUP_SQL_DIR 와 같은 경로
+      - ${BACKUP_ROOT:?.env 에 BACKUP_ROOT 를 넣으세요}/db:/var/opt/mssql/backup
+    restart: unless-stopped
+
+volumes:
+  aptlog-mssql-data:

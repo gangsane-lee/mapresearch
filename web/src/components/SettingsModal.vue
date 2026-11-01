@@ -91,6 +91,7 @@ function addAnchor() {
 const API_NAMES = {
   KAKAO_TRANSIT: '카카오 대중교통 (초과 시 유료)',
   NCP_GEOCODE: '네이버 지오코딩',
+  NCP_RGEOCODE: '네이버 역지오코딩 (지도 우클릭)',
   DATA_GO_KR_KAPT: '공동주택 정보',
   DATA_GO_KR_BLD: '건축물대장',
   DATA_GO_KR_RTMS: '매매 실거래',
@@ -187,7 +188,7 @@ const warnRatio = computed(() => Number(settings.quota_warn_ratio ?? 0.7));
 
     <section>
       <h3>백업</h3>
-      <p v-if="!backup?.found" class="muted">백업 기록이 없습니다. <code>scripts\backup.ps1</code> 을 실행하거나 작업 스케줄러에 등록하세요.</p>
+      <p v-if="!backup?.found" class="muted">백업 기록이 없습니다. <code>npm run backup</code> 을 실행하거나 자동 실행(맥 launchd · 윈도우 작업 스케줄러)에 등록하세요.</p>
       <template v-else>
         <p>
           마지막 백업 {{ String(backup.endedAt ?? backup.startedAt).replace('T', ' ') }} —
@@ -209,7 +210,7 @@ input.s { width: 80px; }
 input.m { width: 120px; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
 .tbl th, .tbl td { padding: 4px 6px; border-bottom: 1px solid var(--line); text-align: left; }
-.tbl tr.warn td { background: #fffbeb; }
+.tbl tr.warn td { background: var(--tint-warn); }
 .actions { display: flex; gap: 12px; justify-content: flex-end; align-items: center; margin-bottom: 20px; }
 .err { color: var(--up); }
 .warn { color: var(--warn); }

@@ -12,15 +12,17 @@
   "scripts": {
     "migrate": "node db/run-migrations.js",
     "migrate:status": "node db/run-migrations.js --status",
+    "db:setup": "node scripts/setup-db.js",
     "geo:build": "node geo/build-boundaries.js",
     "dev:api": "npm run dev -w api",
     "start": "npm start -w api",
-    "test": "node --test \"db/test/*.test.js\" \"geo/test/*.test.js\" && npm test -w api && npm test -w web",
+    "test": "node --test \"db/test/*.test.js\" \"geo/test/*.test.js\" \"scripts/test/*.test.js\" && npm test -w api && npm test -w web",
     "dev:web": "npm run dev -w web",
     "build": "npm run build -w web",
     "test:db": "node --env-file=.env.test --test \"api/test-db/*.test.js\"",
     "kapt:import": "node scripts/import-kapt.js",
-    "trades:sync": "node scripts/sync-trades.js"
+    "trades:sync": "node scripts/sync-trades.js",
+    "backup": "node scripts/backup.js"
   },
   "dependencies": {
     "mssql": "12.7.13"

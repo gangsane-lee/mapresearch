@@ -24,6 +24,8 @@ USING (VALUES
     ('quota.KAKAO_TRANSIT.DAY',    N'800'),
     ('quota.NCP_GEOCODE.DAY',      N'2000'),
     ('quota.NCP_GEOCODE.MONTH',    N'50000'),
+    ('quota.NCP_RGEOCODE.DAY',     N'2000'),     -- 지도 우클릭 단지 찾기 (무료 3,000,000/월)
+    ('quota.NCP_RGEOCODE.MONTH',   N'50000'),
     ('quota.DATA_GO_KR_KAPT.DAY',  N'4000'),     -- 개발계정 5,000/일의 80%
     ('quota.DATA_GO_KR_BLD.DAY',   N'4000'),     -- 한도 확인 전 보수적 기본값
     ('quota.DATA_GO_KR_RTMS.DAY',  N'8000'),     -- 개발계정 10,000/일의 80%

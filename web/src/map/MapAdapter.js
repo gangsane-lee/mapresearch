@@ -6,6 +6,7 @@
 //   mount(el: HTMLElement, opts: { center: {lat,lng}, zoom: number }): Promise<void>
 //   destroy(): void
 //   setCenter(pos: {lat,lng}, zoom?: number): void
+//   resize(): void                                                  // 컨테이너 크기 변경 후
 //   fitBounds(bbox: number[], padding?: number): void
 //   setMask(geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon | null): void   // null = 해제
 //   addMarker(m: { id, position: {lat,lng}, html: string, dimmed?: boolean }): void
@@ -14,6 +15,8 @@
 //   clearMarkers(): void
 //   onMarkerClick(handler: (id, ev: { ctrlKey: boolean, metaKey: boolean }) => void): void
 //   onMapClick(handler: (pos: {lat,lng}) => void): void
+//   onAreaSelect(handler: (bounds: {minLat,minLng,maxLat,maxLng}) => void): void   // Ctrl(⌘)+드래그 사각형
+//   onMapRightClick(handler: (pos: {lat,lng}, point: {x,y}) => void): void         // point = 지도 요소 기준 px
 // }
 
 /**
@@ -47,6 +50,7 @@ export class NullMapAdapter {
     this.el?.classList.remove('map-unavailable');
   }
   setCenter() {}
+  resize() {}
   fitBounds() {}
   setMask() {}
   addMarker(m) {
@@ -71,6 +75,8 @@ export class NullMapAdapter {
     this.clickHandler = handler;
   }
   onMapClick() {}
+  onAreaSelect() {} // 목록 모드에는 영역이 없다 (Ctrl+클릭으로 다중 선택)
+  onMapRightClick() {}
 
   #render() {
     if (!this.list) return;
